@@ -1,0 +1,2036 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Decision Tree Builder · Editor + Visualizer</title>
+  <meta name="description" content="Decision tree offline-first per valutare adozione AI. Multi-case, scoring Fit/Readiness/Risk, export/import JSON, editor nodi/scelte, export PDF, visualizzazione grafica interattiva." />
+
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --panel: rgba(255,255,255,.06);
+      --panel2: rgba(255,255,255,.08);
+      --stroke: rgba(255,255,255,.10);
+      --stroke2: rgba(255,255,255,.16);
+      --text:#eef2f7;
+      --muted: rgba(238,242,247,.68);
+      --muted2: rgba(238,242,247,.52);
+      --shadow: 0 20px 60px rgba(0,0,0,.35);
+      --shadow2: 0 10px 30px rgba(0,0,0,.25);
+      --blur: 18px;
+      --radius: 18px;
+
+      --good: rgba(73,207,122,.16);
+      --warn: rgba(255,204,77,.16);
+      --bad: rgba(255,92,92,.16);
+
+      --goodText: #7CFFB0;
+      --warnText: #FFD77A;
+      --badText: #FF8A8A;
+
+      --chip: rgba(255,255,255,.08);
+      --chipStroke: rgba(255,255,255,.14);
+
+      --focus: rgba(90, 161, 255, .35);
+      --accent: #74a7ff;
+      --accent2: #a4c2ff;
+
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial;
+    }
+
+    [data-theme="light"]{
+      --bg:#f6f7f9;
+      --panel: rgba(255,255,255,.80);
+      --panel2: rgba(255,255,255,.92);
+      --stroke: rgba(10,14,20,.10);
+      --stroke2: rgba(10,14,20,.16);
+      --text:#0b1220;
+      --muted: rgba(11,18,32,.65);
+      --muted2: rgba(11,18,32,.50);
+      --shadow: 0 20px 60px rgba(10,14,20,.10);
+      --shadow2: 0 10px 30px rgba(10,14,20,.10);
+
+      --good: rgba(73,207,122,.18);
+      --warn: rgba(255,204,77,.22);
+      --bad: rgba(255,92,92,.18);
+
+      --chip: rgba(10,14,20,.06);
+      --chipStroke: rgba(10,14,20,.12);
+
+      --focus: rgba(90, 161, 255, .35);
+      --accent: #2563eb;
+      --accent2: #4f86ff;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(1000px 600px at 15% 10%, rgba(116,167,255,.18), transparent 55%),
+        radial-gradient(900px 600px at 80% 20%, rgba(124,255,176,.12), transparent 55%),
+        radial-gradient(900px 650px at 50% 80%, rgba(255,215,122,.10), transparent 55%),
+        var(--bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .wrap{ max-width: 1400px; margin: 0 auto; padding: 22px 18px 40px; }
+
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 14px 14px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border: 1px solid var(--stroke);
+      box-shadow: var(--shadow2);
+      backdrop-filter: blur(var(--blur));
+      position: sticky;
+      top: 14px;
+      z-index: 20;
+    }
+    @media (max-width:980px){ .topbar{ position:relative; top:0; } }
+
+    .brand{ display:flex; align-items:center; gap:12px; min-width: 260px; }
+    .logo{
+      width: 40px; height:40px; border-radius:14px;
+      background:
+        radial-gradient(10px 10px at 30% 30%, rgba(255,255,255,.55), transparent 60%),
+        linear-gradient(135deg, rgba(116,167,255,.95), rgba(124,255,176,.70));
+      box-shadow: 0 12px 22px rgba(0,0,0,.20);
+      border: 1px solid rgba(255,255,255,.25);
+    }
+    .title{ display:flex; flex-direction:column; line-height:1.05; }
+    .title strong{ font-size:14px; letter-spacing:.2px; }
+    .title span{ font-size:12px; color: var(--muted); margin-top:3px; }
+
+    .actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+
+    .btn{
+      appearance:none;
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 14px;
+      font-size: 13px;
+      letter-spacing: .2px;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      cursor:pointer;
+      transition: transform .12s ease, border-color .2s ease, box-shadow .2s ease;
+      box-shadow: 0 10px 20px rgba(0,0,0,.12);
+      user-select:none;
+    }
+    .btn:hover{ border-color: var(--stroke2); transform: translateY(-1px); box-shadow: 0 14px 26px rgba(0,0,0,.16); }
+    .btn:active{ transform: translateY(0px) scale(.99); }
+    .btn:focus{ outline:none; box-shadow: 0 0 0 4px var(--focus), 0 14px 26px rgba(0,0,0,.16); }
+    .btn.small{ padding: 8px 10px; border-radius: 12px; font-size: 12px; }
+    .btn.primary{ border-color: rgba(116,167,255,.35); background: linear-gradient(180deg, rgba(116,167,255,.22), rgba(116,167,255,.12)); }
+    .btn.ghost{ background: rgba(255,255,255,.03); box-shadow:none; }
+
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      font-size: 12px;
+      user-select:none;
+    }
+
+    select, textarea, input{
+      width:100%;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    textarea{ min-height: 120px; resize: vertical; font-family: var(--sans); }
+    select:focus, textarea:focus, input:focus{ border-color: rgba(116,167,255,.45); box-shadow: 0 0 0 4px var(--focus); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    @media (max-width:1200px){ .grid{ grid-template-columns:1fr; } }
+
+    .card{
+      border: 1px solid var(--stroke);
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(var(--blur));
+      padding: 14px;
+      overflow:hidden;
+    }
+    .cardHeader{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom: 10px; }
+    .cardHeader h2{ margin:0; font-size: 14px; letter-spacing:.2px; }
+    .cardHeader p{ margin:4px 0 0; color: var(--muted); font-size:12.5px; line-height:1.3; }
+
+    .section{
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.04);
+    }
+    .section + .section{ margin-top:12px; }
+
+    .row{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    @media (max-width:980px){ .row{ grid-template-columns:1fr; } }
+
+    .label{ font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+    .smallText{ font-size: 12px; color: var(--muted2); line-height: 1.35; margin-top: 8px; }
+
+    .qTitle{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 10px; }
+    .tag{
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--chipStroke);
+      background: var(--chip);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .question{ font-size: 16px; line-height:1.25; margin:0 0 10px; letter-spacing:.2px; }
+    .help{ margin:0 0 12px; font-size:12.5px; color: var(--muted); line-height:1.35; }
+
+    .choices{ display:flex; gap:10px; flex-wrap:wrap; }
+    .choice{
+      flex: 1 1 150px;
+      min-width: 140px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+      border-radius: 16px;
+      padding: 12px;
+      cursor:pointer;
+      transition: transform .12s ease, border-color .2s ease, background .2s ease;
+      user-select:none;
+    }
+    .choice:hover{ transform: translateY(-1px); border-color: var(--stroke2); background: rgba(255,255,255,.05); }
+    .choice:active{ transform: translateY(0px) scale(.995); }
+    .choice strong{ display:block; font-size: 13px; margin-bottom: 4px; }
+    .choice span{ display:block; font-size: 12px; color: var(--muted); line-height: 1.25; }
+
+    .path{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px; border-radius: 999px;
+      border: 1px solid var(--chipStroke);
+      background: var(--chip);
+      font-size: 12px; color: var(--muted);
+    }
+    .chip b{ color: var(--text); font-weight: 600; }
+
+    .badge{
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .badge.good{ background: var(--good); border-color: rgba(124,255,176,.25); color: var(--goodText); }
+    .badge.warn{ background: var(--warn); border-color: rgba(255,215,122,.25); color: var(--warnText); }
+    .badge.bad{  background: var(--bad);  border-color: rgba(255,92,92,.25); color: var(--badText); }
+
+    .meters{ display:grid; grid-template-columns: 1fr; gap:10px; margin-top: 12px; }
+    .meter{
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,.03);
+    }
+    .meterTop{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .meterTop b{ font-size: 12.5px; }
+    .meterTop span{ font-size:12px; color: var(--muted); font-family: var(--mono); }
+    .bar{ position:relative; height: 10px; border-radius: 999px; border: 1px solid var(--stroke); background: rgba(255,255,255,.04); overflow:hidden; margin-top: 8px; }
+    .bar i{ position:absolute; inset:0 auto 0 0; width:0%; border-radius:999px; background: linear-gradient(90deg, rgba(116,167,255,.85), rgba(124,255,176,.70)); transition: width .35s cubic-bezier(.2,.9,.2,1); }
+
+    .verdict{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.03);
+    }
+    .verdict h3{ margin:0 0 6px; font-size: 14px; letter-spacing:.2px; }
+    .verdict p{ margin:0; color: var(--muted); font-size: 12.5px; line-height:1.35; }
+
+    .divider{
+      height: 1px;
+      background: var(--stroke);
+      margin: 12px 0;
+    }
+
+    .toast{
+      position: fixed; left:50%; bottom: 18px;
+      transform: translateX(-50%) translateY(20px);
+      opacity:0; pointer-events:none;
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border: 1px solid var(--stroke);
+      border-radius: 999px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow2);
+      backdrop-filter: blur(var(--blur));
+      font-size: 12.5px;
+      color: var(--text);
+      transition: opacity .2s ease, transform .25s cubic-bezier(.2,.9,.2,1);
+      z-index: 999;
+      display:flex; align-items:center; gap:10px;
+      max-width: calc(100vw - 24px);
+      white-space: nowrap; overflow:hidden; text-overflow: ellipsis;
+    }
+    .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+
+    /* TREE VISUALIZER STYLES */
+    #treeViz {
+      position: relative;
+      min-height: 500px;
+      background: rgba(255,255,255,.02);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    #treeCanvas {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #treeCanvas:active {
+      cursor: grabbing;
+    }
+
+    .tree-node {
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tree-node:hover .node-bg {
+      filter: brightness(1.2);
+    }
+
+    .tree-node.current .node-bg {
+      stroke: var(--accent);
+      stroke-width: 3;
+      filter: brightness(1.3);
+    }
+
+    .tree-node.visited .node-bg {
+      fill: rgba(124,255,176,.15);
+    }
+
+    .tree-node.unvisited .node-bg {
+      fill: rgba(255,255,255,.05);
+      opacity: 0.6;
+    }
+
+    .tree-link {
+      fill: none;
+      stroke: var(--stroke2);
+      stroke-width: 2;
+      transition: all 0.3s ease;
+    }
+
+    .tree-link.active {
+      stroke: var(--accent);
+      stroke-width: 3;
+    }
+
+    .tree-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .tree-btn {
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .tree-btn:hover {
+      background: var(--panel2);
+      transform: scale(1.05);
+    }
+
+    .tree-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--panel);
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      backdrop-filter: blur(10px);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* LANGUAGE TOGGLE */
+    .lang-toggle {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--stroke);
+      cursor: pointer;
+      transition: all .2s ease;
+      font-weight: 600;
+    }
+    .lang-toggle:hover { background: var(--panel2); }
+    .lang-toggle.active { background: var(--accent); color: white; }
+
+    @media print{
+      .topbar, .actions, .noPrint{ display:none !important; }
+      body{ background:#fff; color:#000; }
+      .card{ box-shadow:none; border:1px solid #ddd; background:#fff; }
+      textarea, input, select{ border:1px solid #ddd; background:#fff; color:#000; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div class="title">
+          <strong>AI Decision Tree Builder</strong>
+          <span>multi-case, scoring, export, PDF, editor, visualizer</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <span class="pill" id="savedPill">Salvato localmente</span>
+        <button class="lang-toggle active" id="langToggle" title="Toggle language">🇮🇹 IT</button>
+
+        <button class="btn small" id="btnTheme" title="Toggle tema"><span aria-hidden="true">◐</span><span>Tema</span></button>
+        <button class="btn small primary" id="btnTreeViz" title="Toggle visualizzazione albero"><span aria-hidden="true">🌳</span><span>Albero</span></button>
+        <button class="btn small" id="btnEditor" title="Toggle editor"><span aria-hidden="true">✎</span><span>Editor</span></button>
+        <button class="btn small" id="btnReset" title="Reset percorso"><span aria-hidden="true">↺</span><span>Reset</span></button>
+
+        <button class="btn small" id="btnExport" title="Esporta JSON"><span aria-hidden="true">⇩</span><span>Export JSON</span></button>
+        <label class="btn small" for="fileImport" title="Importa JSON" style="cursor:pointer;">
+          <span aria-hidden="true">⇧</span><span>Import JSON</span>
+        </label>
+        <input id="fileImport" type="file" accept="application/json" style="display:none;" />
+
+        <button class="btn small" id="btnPrint" title="Stampa o salva PDF (Print)"><span aria-hidden="true">⎙</span><span>Print</span></button>
+
+        <button class="btn primary" id="btnCopyMemo" title="Copia Decision Memo"><span aria-hidden="true">⧉</span><span>Copia memo</span></button>
+      </div>
+    </div>
+
+    <!-- TREE VISUALIZER (NEW) -->
+    <div class="card noPrint" id="treeVizCard" style="display:none; margin-top: 14px;">
+      <div class="cardHeader">
+        <div>
+          <h2>Visualizzazione Albero Decisionale</h2>
+          <p>Mappa interattiva del percorso. Clicca sui nodi per navigare.</p>
+        </div>
+      </div>
+      <div class="section">
+        <div id="treeViz">
+          <svg id="treeCanvas" viewBox="0 0 1200 600"></svg>
+          <div class="tree-controls">
+            <button class="tree-btn" id="btnZoomIn">+</button>
+            <button class="tree-btn" id="btnZoomOut">−</button>
+            <button class="tree-btn" id="btnResetView">Reset</button>
+          </div>
+          <div class="tree-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background: rgba(124,255,176,.6);"></div>
+              <span>Visitato</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: var(--accent);"></div>
+              <span>Corrente</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background: rgba(255,255,255,.15);"></div>
+              <span>Non visitato</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT -->
+      <div class="card">
+        <div class="cardHeader">
+          <div>
+            <h2>Decisione</h2>
+            <p>Scegli un case, rispondi alle domande. Se attivi Editor, modifichi l'albero live.</p>
+          </div>
+          <span class="badge" id="statusBadge">IN CORSO</span>
+        </div>
+
+        <div class="section noPrint">
+          <div class="row">
+            <div>
+              <div class="label">Case study</div>
+              <select id="caseSelect"></select>
+              <div class="smallText">Ogni case salva il suo stato separatamente (localStorage).</div>
+            </div>
+            <div>
+              <div class="label">Parametri PoC</div>
+              <div class="row" style="grid-template-columns:1fr 1fr;">
+                <input id="confThreshold" type="number" min="50" max="95" step="5" value="80" />
+                <input id="intentCount" type="number" min="4" max="20" step="1" value="10" />
+              </div>
+              <div class="smallText">Sinistra: soglia confidenza %, destra: numero intent target.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DECISION PANEL -->
+        <div class="section">
+          <div class="qTitle">
+            <div class="tag" id="nodeTag">Nodo</div>
+            <div class="tag" id="stepTag">Step</div>
+          </div>
+
+          <p class="question" id="questionText">...</p>
+          <p class="help" id="questionHelp">...</p>
+
+          <div class="choices" id="choices"></div>
+
+          <div class="meters">
+            <div class="meter">
+              <div class="meterTop"><b>Fit AI</b><span id="fitPct">0%</span></div>
+              <div class="bar"><i id="fitFill"></i></div>
+            </div>
+            <div class="meter">
+              <div class="meterTop"><b>Readiness</b><span id="readyPct">0%</span></div>
+              <div class="bar"><i id="readyFill"></i></div>
+            </div>
+            <div class="meter">
+              <div class="meterTop"><b>Rischio</b><span id="riskPct">0%</span></div>
+              <div class="bar"><i id="riskFill"></i></div>
+            </div>
+          </div>
+
+          <div class="path" id="pathChips"></div>
+        </div>
+
+        <!-- EDITOR PANEL -->
+        <div class="section noPrint" id="editorPanel" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <h3 style="margin:0;font-size:14px;">Editor nodo</h3>
+              <span class="tag" id="editNodeIdTag">ID: -</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button class="btn small" id="btnAddNode" title="Crea un nuovo nodo e collegalo">+ Nodo</button>
+              <button class="btn small" id="btnDuplicateNode" title="Duplica il nodo corrente">⧉ Duplica</button>
+              <button class="btn small ghost" id="btnDeleteNode" title="Elimina il nodo corrente (non Start)">🗑 Elimina</button>
+
+              <div style="display:flex;align-items:center;gap:8px;margin-left:4px;flex-wrap:wrap;">
+                <span class="tag" style="opacity:.9;">Vai al nodo</span>
+                <input id="goNodeSearch" placeholder="Es. N3 o Nodo" style="width:160px;max-width:44vw;" />
+                <select id="goNodeSelect" style="width:180px;max-width:50vw;"></select>
+                <button class="btn small" id="btnGoNode" title="Vai al nodo selezionato">Vai</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row" style="grid-template-columns: 1.4fr .6fr;">
+            <div>
+              <div class="label">Label nodo (es. "Nodo A")</div>
+              <input id="editLabel" />
+            </div>
+            <div>
+              <div class="label">Step (1–6)</div>
+              <input id="editStep" type="number" min="1" max="6" step="1" />
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="label">Testo domanda</div>
+          <textarea id="editQuestion"></textarea>
+
+          <div class="label" style="margin-top:8px;">Testo di supporto</div>
+          <textarea id="editHelp"></textarea>
+
+          <div class="divider"></div>
+
+          <div class="label">Scelte (testo, next, delta Fit/Ready/Risk)</div>
+          <div id="editChoices"></div>
+
+          <button class="btn small" id="btnAddChoice" style="margin-top:8px;">+ Aggiungi scelta</button>
+
+          <div class="smallText">
+            Tip: per "fine percorso", scegli un next tipo END_GO, END_NOT_YET, END_RULES, END_RISKY, END_NO.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="verdict">
+            <div>
+              <h3 id="verdictTitle">Verdetto provvisorio</h3>
+              <p id="verdictText">Completa il percorso, oppure modifica l'albero con Editor.</p>
+            </div>
+            <span class="badge" id="verdictBadge">N/A</span>
+          </div>
+
+          <div class="smallText">
+            Regola: Fit alto + Readiness basso = "AI possibile, ma non ora". Fit alto + risk alto = "AI sì, ma con guardrail".
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="card">
+        <div class="cardHeader">
+          <div>
+            <h2>Decision Memo</h2>
+            <p>Output "board-ready". Copia, esporta JSON, PDF.</p>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="label">Titolo decisione</div>
+          <input id="memoTitle" />
+
+          <div class="row" style="margin-top:10px;">
+            <div>
+              <div class="label">Processo</div>
+              <input id="memoProcess" />
+            </div>
+            <div>
+              <div class="label">Stakeholder</div>
+              <input id="memoStake" />
+            </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <div class="label">Problema (1–2 righe)</div>
+            <textarea id="memoProblem"></textarea>
+          </div>
+
+          <div style="margin-top:10px;">
+            <div class="label">Raccomandazione</div>
+            <textarea id="memoReco"></textarea>
+          </div>
+
+          <div style="margin-top:10px;">
+            <div class="label">Rischi e mitigazioni</div>
+            <textarea id="memoRisks"></textarea>
+          </div>
+
+          <div style="margin-top:10px;">
+            <div class="label">Prossimo step (PoC)</div>
+            <textarea id="memoNext"></textarea>
+          </div>
+
+          <div class="smallText">
+            Inserisci sempre condizioni di stop, se non raggiungiamo X, fermiamo o riprogettiamo.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="label">Snapshot JSON (solo lettura)</div>
+          <textarea id="jsonPreview" readonly style="font-family: var(--mono); min-height: 180px;"></textarea>
+          <div class="smallText">Perfetto da versionare su GitHub, e ri-importare per demo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">OK</div>
+
+  <script>
+    const TREES = {
+      "email-triage-v2": {
+        title: "AI per Email Triage Post-Vendita",
+        defaults: {
+          process: "Gestione email post-vendita: lettura, classificazione, routing, estrazione dati",
+          stakeholders: "Customer Ops, IT/Digital, Compliance, Management",
+          problem: "Volume alto, contenuti non strutturati e smistamento manuale causano tempi di risposta lunghi, costi operativi elevati e errori di routing."
+        },
+        start: "A",
+        nodes: {
+          A: {
+            label:"Nodo A", step:1,
+            q:"Volumi e ripetitività: arrivano molti casi simili in modo ricorrente?",
+            h:"Se i volumi sono bassi o i casi unici, spesso l'AI è un costo, non un acceleratore.",
+            choices:[
+              {k:"no",  t:"No", d:"Volumi bassi o casi non ripetitivi", n:"END_NO",  s:{fit:-20, ready:0,  risk:0}},
+              {k:"yes", t:"Sì", d:"Volumi alti e pattern ricorrenti",  n:"B",       s:{fit:+20, ready:+5, risk:0}}
+            ]
+          },
+          B: {
+            label:"Nodo B", step:2,
+            q:"Non strutturato: testo libero e/o allegati (PDF, immagini) sono comuni?",
+            h:"Qui l'AI aiuta: classificazione intent, estrazione campi, OCR, instradamento.",
+            choices:[
+              {k:"no",  t:"No", d:"Sono dati già strutturati", n:"END_RULES", s:{fit:-10, ready:+10, risk:0}},
+              {k:"yes", t:"Sì", d:"Testo libero e allegati frequenti", n:"C", s:{fit:+20, ready:+0, risk:+5}}
+            ]
+          },
+          C: {
+            label:"Nodo C", step:3,
+            q:"Impatto errore: sbagliare routing o estrazione crea problemi su SLA, clienti o compliance?",
+            h:"Se alto, serve human-in-the-loop e audit log.",
+            choices:[
+              {k:"low",  t:"Basso", d:"Errore tollerabile", n:"D", s:{fit:+10, ready:+5,  risk:+5}},
+              {k:"med",  t:"Medio", d:"Gestibile con soglie e fallback", n:"D", s:{fit:+5,  ready:+5,  risk:+15}},
+              {k:"high", t:"Alto",  d:"Rischio elevato o regolatorio", n:"D", s:{fit:+0,  ready:+10, risk:+30}}
+            ]
+          },
+          D: {
+            label:"Nodo D", step:4,
+            q:"Spiegabilità: serve motivare la decisione (audit, cliente, governance)?",
+            h:"In enterprise conta difendibilità: log, confidenza, rationale, tracciabilità.",
+            choices:[
+              {k:"no",  t:"No", d:"Spiegabilità non critica", n:"E", s:{fit:+5,  ready:+0,  risk:+10}},
+              {k:"yes", t:"Sì", d:"Audit log e rationale richiesti", n:"E", s:{fit:+10, ready:+10, risk:+5}}
+            ]
+          },
+          E: {
+            label:"Nodo E", step:5,
+            q:"Readiness: integrazioni (CRM/ticketing) e logging sono fattibili subito?",
+            h:"Se non integri, resta una demo. Prima plumbing, poi AI.",
+            choices:[
+              {k:"no",  t:"No", d:"Integrazioni non pronte", n:"END_NOT_YET", s:{fit:-10, ready:-20, risk:+10}},
+              {k:"yes", t:"Sì", d:"Integrazioni e log fattibili", n:"F", s:{fit:+15, ready:+15, risk:+5}}
+            ]
+          },
+          F: {
+            label:"Nodo F", step:6,
+            q:"Rollout: come riduci rischio e aumenti adozione?",
+            h:"Il rollout progressivo evita il pilot fallito e costruisce fiducia.",
+            choices:[
+              {k:"pilot", t:"Pilota controllato", d:"Soglie + fallback umano + audit log", n:"END_GO", s:{fit:+10, ready:+10, risk:-10}},
+              {k:"full",  t:"Automazione totale", d:"End-to-end senza supervisione iniziale", n:"END_RISKY", s:{fit:+5,  ready:+0,  risk:+25}}
+            ]
+          }
+        }
+      },
+
+      "hr-screening-v1": {
+        title: "AI per Pre-Screening CV (HR)",
+        defaults: {
+          process: "Pre-screening CV: triage, evidenze, shortlist",
+          stakeholders: "HR, Hiring Manager, Legal/Privacy, IT",
+          problem: "Troppi CV, tempi lunghi di shortlist e inconsistenza tra valutatori, con rischio bias e compliance."
+        },
+        start:"A",
+        nodes:{
+          A:{ label:"Nodo A", step:1,
+            q:"Volume: arrivano molti CV per ruolo, ripetutamente?",
+            h:"Se pochi CV, meglio processo umano standardizzato e criteri chiari.",
+            choices:[
+              {k:"no", t:"No", d:"Pochi CV o ruoli sporadici", n:"END_NO", s:{fit:-15, ready:+5, risk:+5}},
+              {k:"yes",t:"Sì", d:"Molti CV e ruoli ricorrenti", n:"B", s:{fit:+15, ready:+5, risk:+5}}
+            ]
+          },
+          B:{ label:"Nodo B", step:2,
+            q:"Criteri: i criteri di screening sono chiari e documentabili?",
+            h:"Se i criteri sono vaghi, l'AI amplifica confusione e bias.",
+            choices:[
+              {k:"no", t:"No", d:"Criteri non formalizzati", n:"END_NOT_YET", s:{fit:-10, ready:-15, risk:+15}},
+              {k:"yes",t:"Sì", d:"Must-have e nice-to-have definiti", n:"C", s:{fit:+15, ready:+10, risk:+5}}
+            ]
+          },
+          C:{ label:"Nodo C", step:3,
+            q:"Rischio: vincoli legali o bias elevati (parità, GDPR, audit)?",
+            h:"Se alto, serve explainability e human-in-the-loop.",
+            choices:[
+              {k:"low", t:"Basso", d:"Uso interno con controlli minimi", n:"D", s:{fit:+10, ready:+5,  risk:+10}},
+              {k:"high",t:"Alto",  d:"Forte attenzione a bias e audit", n:"D", s:{fit:+10, ready:+10, risk:+25}}
+            ]
+          },
+          D:{ label:"Nodo D", step:4,
+            q:"Dati: hai rubriche di valutazione e storico decisioni coerente?",
+            h:"Senza dati, meglio AI come supporto con evidenze, non ranking duro.",
+            choices:[
+              {k:"no", t:"No", d:"Storico debole o incoerente", n:"E", s:{fit:+5, ready:-10, risk:+10}},
+              {k:"yes",t:"Sì", d:"Storico e rubriche disponibili", n:"E", s:{fit:+10, ready:+15, risk:+10}}
+            ]
+          },
+          E:{ label:"Nodo E", step:5,
+            q:"Output: preferisci triage con evidenze o ranking puro?",
+            h:"Ranking puro è rischioso. Triage con evidenze è spesso più difendibile.",
+            choices:[
+              {k:"triage", t:"Triage + evidenze", d:"Suggerisce e cita motivi", n:"F", s:{fit:+15, ready:+10, risk:+5}},
+              {k:"rank",   t:"Ranking", d:"Ordina automaticamente i CV", n:"F", s:{fit:+10, ready:+5,  risk:+20}}
+            ]
+          },
+          F:{ label:"Nodo F", step:6,
+            q:"Governance: definisci guardrail e monitoraggio?",
+            h:"Soglie, log, review umana e monitoraggio bias sono necessari per scalare.",
+            choices:[
+              {k:"yes", t:"Sì", d:"Guardrail, log, review e monitoraggio", n:"END_GO", s:{fit:+10, ready:+10, risk:-10}},
+              {k:"no",  t:"No", d:"Nessun guardrail serio", n:"END_RISKY", s:{fit:+5,  ready:-5,  risk:+25}}
+            ]
+          }
+        }
+      },
+
+      "maintenance-v1": {
+        title: "AI per Manutenzione Predittiva (Industria)",
+        defaults:{
+          process:"Manutenzione: prevenzione guasti su asset critici",
+          stakeholders:"Operations, Maintenance, Engineering, IT/OT, Procurement",
+          problem:"Fermi impianto costosi e manutenzione non ottimizzata, con dati sensori disponibili ma poco sfruttati."
+        },
+        start:"A",
+        nodes:{
+          A:{ label:"Nodo A", step:1,
+            q:"Costo downtime: un fermo impianto ha impatto economico significativo?",
+            h:"Se il downtime costa poco, la manutenzione predittiva può non ripagare.",
+            choices:[
+              {k:"no",  t:"No", d:"Downtime poco costoso", n:"END_RULES", s:{fit:-10, ready:+10, risk:+5}},
+              {k:"yes", t:"Sì", d:"Downtime costoso", n:"B", s:{fit:+20, ready:+5, risk:+5}}
+            ]
+          },
+          B:{ label:"Nodo B", step:2,
+            q:"Dati: hai telemetria e storico guasti affidabile?",
+            h:"Senza storico guasti, puoi iniziare con anomaly detection, non predizione precisa.",
+            choices:[
+              {k:"no",  t:"No", d:"Dati incompleti o non puliti", n:"END_NOT_YET", s:{fit:+5, ready:-20, risk:+10}},
+              {k:"yes", t:"Sì", d:"Telemetria + storico guasti", n:"C", s:{fit:+15, ready:+15, risk:+10}}
+            ]
+          },
+          C:{ label:"Nodo C", step:3,
+            q:"Azione: cosa fai quando un alert indica rischio guasto?",
+            h:"Se non hai workflow, l'AI resta un grafico carino.",
+            choices:[
+              {k:"no",  t:"Non chiaro", d:"Nessun workflow definito", n:"END_NOT_YET", s:{fit:-5, ready:-15, risk:+10}},
+              {k:"yes", t:"Chiaro", d:"Procedure e SLA definiti", n:"D", s:{fit:+10, ready:+10, risk:+5}}
+            ]
+          },
+          D:{ label:"Nodo D", step:4,
+            q:"Rischio: falsi positivi hanno impatto alto (costi, blocchi inutili)?",
+            h:"Serve calibrazione e soglie conservative sugli asset critici.",
+            choices:[
+              {k:"low", t:"Basso", d:"Falsi positivi tollerabili", n:"E", s:{fit:+10, ready:+5,  risk:+10}},
+              {k:"high",t:"Alto",  d:"Falsi positivi costosi", n:"E", s:{fit:+10, ready:+10, risk:+25}}
+            ]
+          },
+          E:{ label:"Nodo E", step:5,
+            q:"Integrazione: CMMS/ERP e ticketing manutenzione sono integrabili?",
+            h:"Serve chiusura del loop: alert → ticket → azione → feedback dati.",
+            choices:[
+              {k:"no",  t:"No", d:"Integrazione non pronta", n:"END_NOT_YET", s:{fit:+5, ready:-10, risk:+10}},
+              {k:"yes", t:"Sì", d:"Integrazione fattibile", n:"F", s:{fit:+10, ready:+15, risk:+5}}
+            ]
+          },
+          F:{ label:"Nodo F", step:6,
+            q:"Rollout: inizi con anomaly detection o predizione guasti?",
+            h:"Spesso si parte con anomaly detection + regole, poi si evolve.",
+            choices:[
+              {k:"anom", t:"Anomaly detection", d:"Partenza pragmatica", n:"END_GO", s:{fit:+10, ready:+10, risk:-10}},
+              {k:"pred", t:"Predizione diretta", d:"Più valore, più rischi", n:"END_RISKY", s:{fit:+10, ready:+5,  risk:+20}}
+            ]
+          }
+        }
+      }
+    };
+
+    const APP = "AI Decision Tree Builder (Editor + Visualizer)";
+    const THEME_KEY = "aidt_theme_editor_v1";
+    const CASE_KEY = "aidt_selected_case_editor_v1";
+    const EDITOR_KEY = "aidt_editor_mode_v1";
+    const VIZ_KEY = "aidt_viz_mode_v1";
+    function storageKeyForCase(caseId){ return `aidt_state_${caseId}_editor_v1`; }
+
+    const $ = (sel) => document.querySelector(sel);
+    const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+    let state = null;
+    let activeCaseId = null;
+    let editorMode = false;
+    let vizMode = false;
+    let treeVizState = {
+      zoom: 1,
+      panX: 0,
+      panY: 0
+    };
+
+    function escapeHtml(s){
+      return String(s)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function showToast(msg){
+      const t = $("#toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      clearTimeout(showToast._tm);
+      showToast._tm = setTimeout(()=> t.classList.remove("show"), 1800);
+    }
+
+    function setTheme(theme){
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem(THEME_KEY, theme);
+    }
+    function initTheme(){
+      const t = localStorage.getItem(THEME_KEY);
+      if (t === "light" || t === "dark") setTheme(t);
+      else setTheme("dark");
+    }
+
+    function defaultState(caseId){
+      const tree = TREES[caseId];
+      return {
+        app: APP,
+        caseId,
+        startedAt: new Date().toISOString(),
+        current: tree.start,
+        path: [],
+        score: { fit: 40, ready: 40, risk: 20 },
+        ending: null,
+        params: { confThreshold: 80, intentCount: 10 },
+        memo: {
+          title: tree.title,
+          process: tree.defaults.process,
+          stakeholders: tree.defaults.stakeholders,
+          problem: tree.defaults.problem
+        }
+      };
+    }
+
+    function loadState(caseId){
+      const raw = localStorage.getItem(storageKeyForCase(caseId));
+      if (!raw) return null;
+      try{
+        const parsed = JSON.parse(raw);
+        if (!parsed?.caseId || parsed.caseId !== caseId) return null;
+        return parsed;
+      }catch(e){
+        return null;
+      }
+    }
+
+    function renderJsonPreview(){
+      const payload = { meta: { app: APP, exportedAt: new Date().toISOString() }, state };
+      $("#jsonPreview").value = JSON.stringify(payload, null, 2);
+    }
+
+    function saveState(silent=false){
+      localStorage.setItem(storageKeyForCase(activeCaseId), JSON.stringify(state));
+      $("#savedPill").textContent = "Salvato localmente";
+      if (!silent) showToast("Salvato");
+      renderJsonPreview();
+    }
+
+    function pct(n){ return clamp(Math.round(n), 0, 100); }
+
+    function verdictFromScores(fit, ready, risk){
+      if (fit < 55) return { badge:"bad", title:"AI non necessaria", tag:"NO" };
+
+      const highRisk = risk > 70;
+      const strong = (fit >= 70 && ready >= 60);
+
+      if (strong && risk <= 60) return { badge:"good", title:"AI consigliata", tag:"GO" };
+      if (highRisk) return { badge:"warn", title:"AI possibile, ma troppo rischiosa così", tag:"ATTENZIONE" };
+      if (fit >= 65 && ready < 60) return { badge:"warn", title:"AI possibile, ma non ora", tag:"NOT YET" };
+      if (strong && risk > 60) return { badge:"warn", title:"AI sì, ma con guardrail forti", tag:"ATTENZIONE" };
+
+      return { badge:"warn", title:"Valutazione mista, serve approfondimento", tag:"ATTENZIONE" };
+    }
+
+    function buildRecoText(){
+      const {fit, ready, risk} = state.score;
+      const v = verdictFromScores(fit, ready, risk);
+      const conf = clamp(parseInt(state.params.confThreshold,10)||80, 50, 95);
+      const intents = clamp(parseInt(state.params.intentCount,10)||10, 4, 20);
+
+      const base = [
+        `Verdetto: ${v.title}.`,
+        `Punteggi: Fit ${pct(fit)}%, Readiness ${pct(ready)}%, Rischio ${pct(risk)}%.`,
+        `Parametri PoC: soglia confidenza ${conf}%, intent target ${intents}.`
+      ];
+
+      if (v.tag === "GO"){
+        base.push(
+          "Approccio: AI con human-in-the-loop, routing, estrazione dati, audit log.",
+          "Rollout: progressivo, prima routing poi extraction, poi automazione parziale."
+        );
+      }else if (v.tag === "NOT YET"){
+        base.push(
+          "Prima di scalare l'AI: integra ticketing/CRM, definisci tassonomia, crea dataset etichettato e logging.",
+          "Pilota ristretto su 1-2 categorie ad alto volume."
+        );
+      }else if (v.tag === "NO"){
+        base.push(
+          "Non adottare AI ora: ottimizza processo con standardizzazione, regole e automazioni leggere.",
+          "Misura volumi e tempi per 4 settimane, poi rivaluta."
+        );
+      }else{
+        base.push(
+          "Serve governance: soglie, audit log, fallback umano, monitoraggio errori e drift.",
+          "Rollout progressivo con stop criteria chiare."
+        );
+      }
+
+      return base.join("\n");
+    }
+
+    function buildRisksText(){
+      const conf = clamp(parseInt(state.params.confThreshold,10)||80, 50, 95);
+      const common = [
+        "Rischio: dati rumorosi o etichette incoerenti.",
+        "Mitigazione: tassonomia 8–12 intent, guideline di etichettatura, dataset 'golden'.",
+        "Rischio: over-automation iniziale.",
+        `Mitigazione: soglia confidenza ${conf}% + fallback umano sotto soglia + audit log.`,
+        "Rischio: mismatch col processo reale.",
+        "Mitigazione: workshop con operatori, mappatura eccezioni, KPI di adozione."
+      ];
+      if (state.score.risk >= 70){
+        common.unshift("Rischio elevato: human-in-the-loop obbligatorio per classi critiche e governance formale.");
+      }
+      return common.join("\n");
+    }
+
+    function buildNextText(){
+      return [
+        "PoC 2 settimane:",
+        "- Dataset: 500–1.000 casi reali, etichettati in 8–12 categorie.",
+        "- KPI: accuracy, riduzione TAT, % fallback umano, error rate routing, adozione interna.",
+        "- Guardrail: threshold, log, classi critiche sempre con revisione umana.",
+        "- Stop criteria: se accuracy < X o TAT non scende almeno Y%, fermare o riprogettare."
+      ].join("\n");
+    }
+
+    function buildMemoText(){
+      const title = $("#memoTitle").value.trim();
+      const proc = $("#memoProcess").value.trim();
+      const stake = $("#memoStake").value.trim();
+      const prob = $("#memoProblem").value.trim();
+      const reco = $("#memoReco").value.trim();
+      const risks = $("#memoRisks").value.trim();
+      const next = $("#memoNext").value.trim();
+
+      const path = state.path.map(p => `${p.nodeLabel}: ${p.choiceTitle}`).join(" | ");
+
+      return [
+        `${title}`,
+        ``,
+        `Processo: ${proc}`,
+        `Stakeholder: ${stake}`,
+        ``,
+        `Problema:`,
+        `${prob}`,
+        ``,
+        `Percorso decisionale:`,
+        `${path || "(non completato)"}`,
+        ``,
+        `Raccomandazione:`,
+        `${reco || "(in corso)"}`,
+        ``,
+        `Rischi e mitigazioni:`,
+        `${risks || "(in corso)"}`,
+        ``,
+        `Prossimo step:`,
+        `${next || "(in corso)"}`
+      ].join("\n");
+    }
+
+    function download(filename, text){
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], {type:"application/json"}));
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
+    }
+
+    async function copyToClipboard(text){
+      try{
+        await navigator.clipboard.writeText(text);
+        showToast("Copiato negli appunti");
+      }catch(e){
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        showToast("Copiato (fallback)");
+      }
+    }
+
+    function applyScores(delta){
+      state.score.fit   = clamp(state.score.fit   + (delta.fit   || 0), 0, 100);
+      state.score.ready = clamp(state.score.ready + (delta.ready || 0), 0, 100);
+      state.score.risk  = clamp(state.score.risk  + (delta.risk  || 0), 0, 100);
+    }
+
+    function currentNode(){
+      const tree = TREES[activeCaseId];
+      return tree.nodes[state.current];
+    }
+
+    function selectChoice(nodeId, choice){
+      const tree = TREES[activeCaseId];
+      const node = tree.nodes[nodeId];
+
+      applyScores(choice.s || {});
+      state.path.push({
+        nodeId,
+        nodeLabel: node.label,
+        choiceKey: choice.k,
+        choiceTitle: choice.t
+      });
+
+      if (String(choice.n || "").startsWith("END_")){
+        state.ending = choice.n;
+      }else{
+        state.current = choice.n;
+      }
+
+      $("#memoReco").value = buildRecoText();
+      $("#memoRisks").value = buildRisksText();
+      $("#memoNext").value = buildNextText();
+
+      saveState();
+      render();
+    }
+
+    function resetCase(hard=false){
+      state = defaultState(activeCaseId);
+
+      $("#memoTitle").value = state.memo.title;
+      $("#memoProcess").value = state.memo.process;
+      $("#memoStake").value = state.memo.stakeholders;
+      $("#memoProblem").value = state.memo.problem;
+      $("#memoReco").value = "";
+      $("#memoRisks").value = "";
+      $("#memoNext").value = "";
+
+      $("#confThreshold").value = state.params.confThreshold;
+      $("#intentCount").value = state.params.intentCount;
+
+      saveState();
+      render();
+      showToast("Reset completato");
+    }
+
+    function render(){
+      const tree = TREES[activeCaseId];
+      
+      if(state.ending){
+        $("#nodeTag").textContent = "FINE";
+        $("#stepTag").textContent = "Completato";
+        $("#questionText").textContent = "Percorso completato!";
+        $("#questionHelp").textContent = "Hai terminato il percorso decisionale. Rivedi il verdetto e la memo.";
+        $("#choices").innerHTML = '<div class="smallText">Percorso terminato. Puoi resettare o cambiare case.</div>';
+        $("#statusBadge").textContent = "COMPLETATO";
+        $("#statusBadge").className = "badge good";
+      }else{
+        const node = currentNode();
+        $("#nodeTag").textContent = node.label || state.current;
+        $("#stepTag").textContent = `Step ${node.step}`;
+        $("#questionText").textContent = node.q || "...";
+        $("#questionHelp").textContent = node.h || "";
+
+        let html = '';
+        (node.choices || []).forEach(ch => {
+          html += `<div class="choice" onclick="selectChoice('${state.current}', ${escapeHtml(JSON.stringify(ch))})">
+            <strong>${escapeHtml(ch.t)}</strong>
+            <span>${escapeHtml(ch.d || "")}</span>
+          </div>`;
+        });
+        $("#choices").innerHTML = html;
+
+        $("#statusBadge").textContent = "IN CORSO";
+        $("#statusBadge").className = "badge warn";
+      }
+
+      const {fit,ready,risk} = state.score;
+      $("#fitPct").textContent = `${pct(fit)}%`;
+      $("#readyPct").textContent = `${pct(ready)}%`;
+      $("#riskPct").textContent = `${pct(risk)}%`;
+      $("#fitFill").style.width = `${pct(fit)}%`;
+      $("#readyFill").style.width = `${pct(ready)}%`;
+      $("#riskFill").style.width = `${pct(risk)}%`;
+
+      let pathHtml = '';
+      state.path.forEach(p => {
+        pathHtml += `<div class="chip"><b>${escapeHtml(p.nodeLabel)}</b>: ${escapeHtml(p.choiceTitle)}</div>`;
+      });
+      $("#pathChips").innerHTML = pathHtml || '<div class="smallText">Nessuna scelta ancora.</div>';
+
+      const v = verdictFromScores(fit, ready, risk);
+      $("#verdictTitle").textContent = v.title;
+      $("#verdictText").textContent = state.ending ? "Percorso completato. Rivedi la Decision Memo." : "Completa il percorso per vedere il verdetto finale.";
+      $("#verdictBadge").textContent = v.tag;
+      $("#verdictBadge").className = `badge ${v.badge}`;
+
+      renderJsonPreview();
+      
+      if(vizMode) {
+        renderTreeVisualization();
+      }
+    }
+
+    // ==================== TREE VISUALIZATION ====================
+    function renderTreeVisualization() {
+      const tree = TREES[activeCaseId];
+      const svg = document.getElementById('treeCanvas');
+      
+      // Clear existing content
+      svg.innerHTML = '';
+      
+      // Create graph structure
+      const graph = buildGraphFromTree(tree);
+      
+      // Layout algorithm (simple hierarchical)
+      const layout = calculateTreeLayout(graph, tree.start);
+      
+      // Create SVG elements
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('transform', `translate(${treeVizState.panX}, ${treeVizState.panY}) scale(${treeVizState.zoom})`);
+      
+      // Draw links first (so they appear behind nodes)
+      layout.links.forEach(link => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const isActive = isLinkInPath(link.source, link.target);
+        path.setAttribute('class', `tree-link ${isActive ? 'active' : ''}`);
+        path.setAttribute('d', `M ${link.x1} ${link.y1} C ${link.x1} ${(link.y1 + link.y2)/2}, ${link.x2} ${(link.y1 + link.y2)/2}, ${link.x2} ${link.y2}`);
+        g.appendChild(path);
+      });
+      
+      // Draw nodes
+      layout.nodes.forEach(node => {
+        const nodeG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const isVisited = isNodeVisited(node.id);
+        const isCurrent = node.id === state.current;
+        
+        nodeG.setAttribute('class', `tree-node ${isCurrent ? 'current' : isVisited ? 'visited' : 'unvisited'}`);
+        nodeG.setAttribute('transform', `translate(${node.x}, ${node.y})`);
+        nodeG.style.cursor = 'pointer';
+        
+        // Background rect
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('class', 'node-bg');
+        rect.setAttribute('x', -50);
+        rect.setAttribute('y', -25);
+        rect.setAttribute('width', 100);
+        rect.setAttribute('height', 50);
+        rect.setAttribute('rx', 10);
+        
+        if (isCurrent) {
+          rect.setAttribute('fill', 'rgba(116,167,255,.25)');
+          rect.setAttribute('stroke', '#74a7ff');
+          rect.setAttribute('stroke-width', 2);
+        } else if (isVisited) {
+          rect.setAttribute('fill', 'rgba(124,255,176,.15)');
+          rect.setAttribute('stroke', 'rgba(124,255,176,.4)');
+          rect.setAttribute('stroke-width', 1);
+        } else {
+          rect.setAttribute('fill', 'rgba(255,255,255,.05)');
+          rect.setAttribute('stroke', 'rgba(255,255,255,.15)');
+          rect.setAttribute('stroke-width', 1);
+        }
+        
+        nodeG.appendChild(rect);
+        
+        // Node label
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('fill', 'var(--text)');
+        text.setAttribute('font-size', '12');
+        text.setAttribute('font-weight', '600');
+        text.textContent = node.label || node.id;
+        nodeG.appendChild(text);
+        
+        // Step indicator
+        const stepText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        stepText.setAttribute('text-anchor', 'middle');
+        stepText.setAttribute('y', 15);
+        stepText.setAttribute('fill', 'var(--muted)');
+        stepText.setAttribute('font-size', '9');
+        stepText.textContent = node.step ? `Step ${node.step}` : '';
+        nodeG.appendChild(stepText);
+        
+        // Click handler
+        nodeG.addEventListener('click', () => {
+          if (!node.id.startsWith('END_')) {
+            state.current = node.id;
+            render();
+            showToast(`Navigato a ${node.label || node.id}`);
+          }
+        });
+        
+        g.appendChild(nodeG);
+      });
+      
+      svg.appendChild(g);
+    }
+
+    function buildGraphFromTree(tree) {
+      const graph = {
+        nodes: [],
+        edges: []
+      };
+      
+      const visited = new Set();
+      const queue = [tree.start];
+      
+      while (queue.length > 0) {
+        const nodeId = queue.shift();
+        if (visited.has(nodeId)) continue;
+        visited.add(nodeId);
+        
+        if (nodeId.startsWith('END_')) {
+          graph.nodes.push({
+            id: nodeId,
+            label: nodeId.replace('END_', ''),
+            isEnd: true
+          });
+          continue;
+        }
+        
+        const node = tree.nodes[nodeId];
+        if (!node) continue;
+        
+        graph.nodes.push({
+          id: nodeId,
+          label: node.label,
+          step: node.step,
+          isEnd: false
+        });
+        
+        (node.choices || []).forEach(choice => {
+          const targetId = choice.n;
+          graph.edges.push({
+            source: nodeId,
+            target: targetId,
+            label: choice.t
+          });
+          
+          if (!visited.has(targetId)) {
+            queue.push(targetId);
+          }
+        });
+      }
+      
+      return graph;
+    }
+
+    function calculateTreeLayout(graph, startId) {
+      const nodePositions = {};
+      const levels = {};
+      
+      // BFS to assign levels
+      const queue = [{id: startId, level: 0}];
+      const visited = new Set();
+      
+      while (queue.length > 0) {
+        const {id, level} = queue.shift();
+        if (visited.has(id)) continue;
+        visited.add(id);
+        
+        levels[id] = level;
+        if (!nodePositions[level]) nodePositions[level] = [];
+        nodePositions[level].push(id);
+        
+        graph.edges.filter(e => e.source === id).forEach(edge => {
+          if (!visited.has(edge.target)) {
+            queue.push({id: edge.target, level: level + 1});
+          }
+        });
+      }
+      
+      // Calculate positions
+      const levelHeight = 120;
+      const nodeSpacing = 180;
+      const startX = 600;
+      const startY = 50;
+      
+      const nodes = [];
+      const links = [];
+      
+      Object.keys(nodePositions).forEach(level => {
+        const nodesInLevel = nodePositions[level];
+        const levelWidth = nodesInLevel.length * nodeSpacing;
+        const levelStartX = startX - levelWidth / 2;
+        
+        nodesInLevel.forEach((nodeId, index) => {
+          const node = graph.nodes.find(n => n.id === nodeId);
+          const x = levelStartX + index * nodeSpacing + nodeSpacing / 2;
+          const y = startY + parseInt(level) * levelHeight;
+          
+          nodes.push({
+            id: nodeId,
+            label: node?.label || nodeId,
+            step: node?.step,
+            x,
+            y,
+            isEnd: node?.isEnd
+          });
+        });
+      });
+      
+      // Calculate link positions
+      graph.edges.forEach(edge => {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        const targetNode = nodes.find(n => n.id === edge.target);
+        
+        if (sourceNode && targetNode) {
+          links.push({
+            source: edge.source,
+            target: edge.target,
+            x1: sourceNode.x,
+            y1: sourceNode.y + 25,
+            x2: targetNode.x,
+            y2: targetNode.y - 25
+          });
+        }
+      });
+      
+      return { nodes, links };
+    }
+
+    function isNodeVisited(nodeId) {
+      return state.path.some(p => p.nodeId === nodeId) || nodeId === TREES[activeCaseId].start;
+    }
+
+    function isLinkInPath(sourceId, targetId) {
+      for (let i = 0; i < state.path.length; i++) {
+        if (state.path[i].nodeId === sourceId) {
+          if (i < state.path.length - 1 && state.path[i + 1].nodeId === targetId) {
+            return true;
+          }
+          // Check if this was the choice that led to target
+          const tree = TREES[activeCaseId];
+          const node = tree.nodes[sourceId];
+          if (node) {
+            const choice = node.choices.find(c => c.k === state.path[i].choiceKey);
+            if (choice && choice.n === targetId) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    // Zoom controls
+    function zoomIn() {
+      treeVizState.zoom = Math.min(treeVizState.zoom * 1.2, 3);
+      renderTreeVisualization();
+    }
+
+    function zoomOut() {
+      treeVizState.zoom = Math.max(treeVizState.zoom / 1.2, 0.3);
+      renderTreeVisualization();
+    }
+
+    function resetView() {
+      treeVizState.zoom = 1;
+      treeVizState.panX = 0;
+      treeVizState.panY = 0;
+      renderTreeVisualization();
+    }
+
+    // Pan functionality
+    let isPanning = false;
+    let panStart = {x: 0, y: 0};
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const canvas = document.getElementById('treeCanvas');
+      
+      canvas.addEventListener('mousedown', (e) => {
+        isPanning = true;
+        panStart = {x: e.clientX - treeVizState.panX, y: e.clientY - treeVizState.panY};
+      });
+      
+      canvas.addEventListener('mousemove', (e) => {
+        if (!isPanning) return;
+        treeVizState.panX = e.clientX - panStart.x;
+        treeVizState.panY = e.clientY - panStart.y;
+        renderTreeVisualization();
+      });
+      
+      canvas.addEventListener('mouseup', () => {
+        isPanning = false;
+      });
+      
+      canvas.addEventListener('mouseleave', () => {
+        isPanning = false;
+      });
+
+      // Zoom controls
+      document.getElementById('btnZoomIn').addEventListener('click', zoomIn);
+      document.getElementById('btnZoomOut').addEventListener('click', zoomOut);
+      document.getElementById('btnResetView').addEventListener('click', resetView);
+    });
+
+    // ==================== END TREE VISUALIZATION ====================
+
+    function initCaseSelect(){
+      const sel = $("#caseSelect");
+      sel.innerHTML = '';
+      Object.keys(TREES).forEach(k => {
+        const opt = document.createElement("option");
+        opt.value = k;
+        opt.textContent = TREES[k].title;
+        sel.appendChild(opt);
+      });
+    }
+
+    function switchCase(caseId){
+      activeCaseId = caseId;
+      localStorage.setItem(CASE_KEY, caseId);
+
+      const existing = loadState(caseId);
+      state = existing || defaultState(caseId);
+
+      $("#caseSelect").value = caseId;
+      $("#memoTitle").value = state.memo.title;
+      $("#memoProcess").value = state.memo.process;
+      $("#memoStake").value = state.memo.stakeholders;
+      $("#memoProblem").value = state.memo.problem;
+      $("#confThreshold").value = state.params.confThreshold;
+      $("#intentCount").value = state.params.intentCount;
+
+      if(state.memo.reco) $("#memoReco").value = state.memo.reco;
+      if(state.memo.risks) $("#memoRisks").value = state.memo.risks;
+      if(state.memo.next) $("#memoNext").value = state.memo.next;
+
+      render();
+    }
+
+    function toggleEditor(){
+      editorMode = !editorMode;
+      localStorage.setItem(EDITOR_KEY, editorMode?"1":"0");
+      $("#editorPanel").style.display = editorMode ? "block" : "none";
+      if(editorMode) loadEditorForNode(state.current);
+      showToast(editorMode ? "Editor attivato" : "Editor disattivato");
+    }
+
+    function toggleTreeViz(){
+      vizMode = !vizMode;
+      localStorage.setItem(VIZ_KEY, vizMode?"1":"0");
+      $("#treeVizCard").style.display = vizMode ? "block" : "none";
+      if(vizMode) {
+        renderTreeVisualization();
+        showToast("Visualizzazione albero attivata");
+      } else {
+        showToast("Visualizzazione albero disattivata");
+      }
+    }
+
+    function loadEditorForNode(nodeId){
+      const tree = TREES[activeCaseId];
+      const node = tree.nodes[nodeId];
+      if(!node) return;
+
+      $("#editNodeIdTag").textContent = `ID: ${nodeId}`;
+      $("#editLabel").value = node.label || "";
+      $("#editStep").value = node.step || 1;
+      $("#editQuestion").value = node.q || "";
+      $("#editHelp").value = node.h || "";
+
+      renderEditorChoices(node.choices || []);
+    }
+
+    function renderEditorChoices(choices){
+      let html = '';
+      choices.forEach((ch,idx)=>{
+        html += `
+          <div class="row" style="grid-template-columns: 1fr 1fr .8fr .4fr .4fr .4fr; gap:6px; margin-bottom:8px;">
+            <input placeholder="Titolo (es: Sì)" value="${escapeHtml(ch.t||"")}" data-idx="${idx}" data-field="t" class="edit-choice-input" />
+            <input placeholder="Descrizione" value="${escapeHtml(ch.d||"")}" data-idx="${idx}" data-field="d" class="edit-choice-input" />
+            <input placeholder="Next (es: B)" value="${escapeHtml(ch.n||"")}" data-idx="${idx}" data-field="n" class="edit-choice-input" />
+            <input type="number" placeholder="Fit" value="${ch.s?.fit||0}" data-idx="${idx}" data-field="s.fit" class="edit-choice-input" style="width:100%;" />
+            <input type="number" placeholder="Ready" value="${ch.s?.ready||0}" data-idx="${idx}" data-field="s.ready" class="edit-choice-input" style="width:100%;" />
+            <input type="number" placeholder="Risk" value="${ch.s?.risk||0}" data-idx="${idx}" data-field="s.risk" class="edit-choice-input" style="width:100%;" />
+          </div>
+        `;
+      });
+      $("#editChoices").innerHTML = html;
+
+      document.querySelectorAll(".edit-choice-input").forEach(inp=>{
+        inp.addEventListener("input", ()=> applyEditorChanges());
+      });
+    }
+
+    function applyEditorChanges(){
+      const tree = TREES[activeCaseId];
+      const node = tree.nodes[state.current];
+      if(!node) return;
+
+      node.label = $("#editLabel").value.trim();
+      node.step = parseInt($("#editStep").value,10)||1;
+      node.q = $("#editQuestion").value.trim();
+      node.h = $("#editHelp").value.trim();
+
+      const inputs = document.querySelectorAll(".edit-choice-input");
+      const choicesData = {};
+      inputs.forEach(inp=>{
+        const idx = parseInt(inp.dataset.idx,10);
+        const field = inp.dataset.field;
+        if(!choicesData[idx]) choicesData[idx] = { s:{} };
+
+        if(field==="s.fit") choicesData[idx].s.fit = parseInt(inp.value,10)||0;
+        else if(field==="s.ready") choicesData[idx].s.ready = parseInt(inp.value,10)||0;
+        else if(field==="s.risk") choicesData[idx].s.risk = parseInt(inp.value,10)||0;
+        else choicesData[idx][field] = inp.value.trim();
+      });
+
+      node.choices = Object.values(choicesData).filter(ch=> ch.t || ch.n);
+      render();
+    }
+
+    $("#btnAddChoice").addEventListener("click",()=>{
+      const tree = TREES[activeCaseId];
+      const node = tree.nodes[state.current];
+      if(!node) return;
+      if(!node.choices) node.choices=[];
+      node.choices.push({k:`choice${node.choices.length}`, t:"Nuova scelta", d:"", n:"", s:{fit:0,ready:0,risk:0}});
+      loadEditorForNode(state.current);
+    });
+
+    $("#btnTheme").addEventListener("click",()=>{
+      const current = document.documentElement.getAttribute("data-theme");
+      setTheme(current==="dark"?"light":"dark");
+      showToast(`Tema: ${current==="dark"?"light":"dark"}`);
+    });
+
+    $("#btnTreeViz").addEventListener("click", toggleTreeViz);
+    $("#btnEditor").addEventListener("click", toggleEditor);
+    $("#btnReset").addEventListener("click", ()=> resetCase());
+
+    $("#btnExport").addEventListener("click",()=>{
+      const payload = { meta: {app: APP, exportedAt: new Date().toISOString()}, state, trees: TREES };
+      download(`aidt-${activeCaseId}-${Date.now()}.json`, JSON.stringify(payload, null, 2));
+      showToast("JSON esportato");
+    });
+
+    $("#fileImport").addEventListener("change",(e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        try{
+          const data = JSON.parse(ev.target.result);
+          if(data.state){
+            state = data.state;
+            activeCaseId = state.caseId;
+            switchCase(activeCaseId);
+            showToast("Stato importato");
+          }
+        }catch(err){
+          showToast("Errore import JSON");
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    $("#btnPrint").addEventListener("click",()=> window.print());
+
+    $("#btnCopyMemo").addEventListener("click",()=>{
+      copyToClipboard(buildMemoText());
+    });
+
+    $("#caseSelect").addEventListener("change",(e)=> switchCase(e.target.value));
+
+    // ========== LANGUAGE TOGGLE ==========
+    const LANG_KEY = 'aidt_lang_v1';
+    let currentLang = localStorage.getItem(LANG_KEY) || 'it';
+
+    const LANG = {
+      it: {
+        subtitle: "multi-case, scoring, export, PDF, editor, visualizer",
+        decision: "Decisione",
+        decisionDesc: "Scegli un case, rispondi alle domande. Se attivi Editor, modifichi l'albero live.",
+        inProgress: "IN CORSO",
+        completed: "COMPLETATO",
+        caseStudy: "Case study",
+        caseDesc: "Ogni case salva il suo stato separatamente (localStorage).",
+        pocParams: "Parametri PoC",
+        pocDesc: "Sinistra: soglia confidenza %, destra: numero intent target.",
+        node: "Nodo",
+        step: "Step",
+        fitAI: "Fit AI",
+        readiness: "Readiness",
+        risk: "Rischio",
+        treeViz: "Visualizzazione Albero Decisionale",
+        treeDesc: "Mappa interattiva del percorso. Clicca sui nodi per navigare.",
+        visited: "Visitato",
+        current: "Corrente",
+        notVisited: "Non visitato",
+        editorNode: "Editor nodo",
+        addNode: "+ Nodo",
+        duplicate: "⧉ Duplica",
+        deleteNode: "🗑 Elimina",
+        goToNode: "Vai al nodo",
+        goToNodePlaceholder: "Es. N3 o Nodo",
+        go: "Vai",
+        nodeLabel: "Label nodo (es. \"Nodo A\")",
+        stepLabel: "Step (1–6)",
+        questionText: "Testo domanda",
+        supportText: "Testo di supporto",
+        choicesLabel: "Scelte (testo, next, delta Fit/Ready/Risk)",
+        addChoice: "+ Aggiungi scelta",
+        endTip: "Tip: per \"fine percorso\", scegli un next tipo END_GO, END_NOT_YET, END_RULES, END_RISKY, END_NO.",
+        decisionMemo: "Decision Memo",
+        memoDesc: "Output \"board-ready\". Copia, esporta JSON, PDF.",
+        decisionTitle: "Titolo decisione",
+        process: "Processo",
+        stakeholders: "Stakeholder",
+        problem: "Problema (1–2 righe)",
+        recommendation: "Raccomandazione",
+        risks: "Rischi e mitigazioni",
+        nextSteps: "Prossimo step (PoC)",
+        stopCriteria: "Inserisci sempre condizioni di stop, se non raggiungiamo X, fermiamo o riprogettiamo.",
+        jsonSnapshot: "Snapshot JSON (solo lettura)",
+        versionDesc: "Perfetto da versionare su GitHub, e ri-importare per demo.",
+        saved: "Salvato localmente",
+        theme: "Tema",
+        tree: "Albero",
+        editor: "Editor",
+        reset: "Reset",
+        exportJSON: "Export JSON",
+        importJSON: "Import JSON",
+        print: "Print",
+        copyMemo: "Copia memo",
+        provisionalVerdict: "Verdetto provvisorio",
+        completePathText: "Completa il percorso, oppure modifica l'albero con Editor.",
+        ruleText: "Regola: Fit alto + Readiness basso = \"AI possibile, ma non ora\". Fit alto + risk alto = \"AI sì, ma con guardrail\".",
+        pathCompleted: "Percorso completato!",
+        pathCompletedDesc: "Hai terminato il percorso decisionale. Rivedi il verdetto e la memo.",
+        pathTerminated: "Percorso terminato. Puoi resettare o cambiare case.",
+        pathCompletedMemo: "Percorso completato. Rivedi la Decision Memo.",
+        noChoiceYet: "Nessuna scelta ancora.",
+        resetCompleted: "Reset completato",
+        editorActivated: "Editor attivato",
+        editorDeactivated: "Editor disattivato",
+        treeActivated: "Visualizzazione albero attivata",
+        treeDeactivated: "Visualizzazione albero disattivata",
+        jsonExported: "JSON esportato",
+        importError: "Errore import JSON",
+        stateImported: "Stato importato",
+        copiedToClipboard: "Copiato negli appunti",
+        copiedFallback: "Copiato (fallback)",
+        languageActivated: "Italiano attivato"
+      },
+      en: {
+        subtitle: "multi-case, scoring, export, PDF, editor, visualizer",
+        decision: "Decision",
+        decisionDesc: "Choose a case, answer questions. Toggle Editor to modify tree live.",
+        inProgress: "IN PROGRESS",
+        completed: "COMPLETED",
+        caseStudy: "Case study",
+        caseDesc: "Each case saves its state separately (localStorage).",
+        pocParams: "PoC Parameters",
+        pocDesc: "Left: confidence threshold %, right: target intent count.",
+        node: "Node",
+        step: "Step",
+        fitAI: "AI Fit",
+        readiness: "Readiness",
+        risk: "Risk",
+        treeViz: "Decision Tree Visualization",
+        treeDesc: "Interactive map. Click nodes to navigate.",
+        visited: "Visited",
+        current: "Current",
+        notVisited: "Not visited",
+        editorNode: "Node Editor",
+        addNode: "+ Node",
+        duplicate: "⧉ Duplicate",
+        deleteNode: "🗑 Delete",
+        goToNode: "Go to node",
+        goToNodePlaceholder: "E.g. N3 or Node",
+        go: "Go",
+        nodeLabel: "Node label (e.g. \"Node A\")",
+        stepLabel: "Step (1–6)",
+        questionText: "Question text",
+        supportText: "Help text",
+        choicesLabel: "Choices (text, next, delta Fit/Ready/Risk)",
+        addChoice: "+ Add choice",
+        endTip: "Tip: for \"end path\", choose next like END_GO, END_NOT_YET, END_RULES, END_RISKY, END_NO.",
+        decisionMemo: "Decision Memo",
+        memoDesc: "Board-ready output. Copy, export JSON, PDF.",
+        decisionTitle: "Decision title",
+        process: "Process",
+        stakeholders: "Stakeholders",
+        problem: "Problem (1–2 lines)",
+        recommendation: "Recommendation",
+        risks: "Risks & mitigations",
+        nextSteps: "Next steps (PoC)",
+        stopCriteria: "Always include stop criteria: if we don't reach X, we stop or redesign.",
+        jsonSnapshot: "JSON snapshot (read-only)",
+        versionDesc: "Perfect for versioning on GitHub and re-importing for demos.",
+        saved: "Saved locally",
+        theme: "Theme",
+        tree: "Tree",
+        editor: "Editor",
+        reset: "Reset",
+        exportJSON: "Export JSON",
+        importJSON: "Import JSON",
+        print: "Print",
+        copyMemo: "Copy memo",
+        provisionalVerdict: "Provisional verdict",
+        completePathText: "Complete the path, or edit the tree with Editor.",
+        ruleText: "Rule: High Fit + Low Readiness = \"AI possible, but not now\". High Fit + high risk = \"AI yes, but with guardrails\".",
+        pathCompleted: "Path completed!",
+        pathCompletedDesc: "You have completed the decision path. Review the verdict and memo.",
+        pathTerminated: "Path terminated. You can reset or change case.",
+        pathCompletedMemo: "Path completed. Review the Decision Memo.",
+        noChoiceYet: "No choice yet.",
+        resetCompleted: "Reset completed",
+        editorActivated: "Editor activated",
+        editorDeactivated: "Editor deactivated",
+        treeActivated: "Tree visualization activated",
+        treeDeactivated: "Tree visualization deactivated",
+        jsonExported: "JSON exported",
+        importError: "JSON import error",
+        stateImported: "State imported",
+        copiedToClipboard: "Copied to clipboard",
+        copiedFallback: "Copied (fallback)",
+        languageActivated: "English activated"
+      }
+    };
+
+    function updateUILanguage() {
+      const t = LANG[currentLang];
+      
+      document.querySelector('.title span').textContent = t.subtitle;
+      
+      const cardHeaders = document.querySelectorAll('.cardHeader h2');
+      const cardDescs = document.querySelectorAll('.cardHeader p');
+      if (cardHeaders[0]) cardHeaders[0].textContent = t.decision;
+      if (cardDescs[0]) cardDescs[0].textContent = t.decisionDesc;
+      if (cardHeaders[1]) cardHeaders[1].textContent = t.treeViz;
+      if (cardDescs[1]) cardDescs[1].textContent = t.treeDesc;
+      if (cardHeaders[2]) cardHeaders[2].textContent = t.decisionMemo;
+      if (cardDescs[2]) cardDescs[2].textContent = t.memoDesc;
+      
+      const labels = document.querySelectorAll('.label');
+      labels.forEach(label => {
+        const text = label.textContent.trim();
+        if (text.includes('Case study')) label.textContent = t.caseStudy;
+        if (text.includes('Parametri PoC') || text.includes('PoC Parameters')) label.textContent = t.pocParams;
+        if (text.includes('Titolo decisione') || text.includes('Decision title')) label.textContent = t.decisionTitle;
+        if (text.includes('Processo') || text.includes('Process')) label.textContent = t.process;
+        if (text.includes('Stakeholder')) label.textContent = t.stakeholders;
+        if (text.includes('Problema') || text.includes('Problem')) label.textContent = t.problem;
+        if (text.includes('Raccomandazione') || text.includes('Recommendation')) label.textContent = t.recommendation;
+        if (text.includes('Rischi') || text.includes('Risks')) label.textContent = t.risks;
+        if (text.includes('Prossimo') || text.includes('Next')) label.textContent = t.nextSteps;
+        if (text.includes('Snapshot JSON')) label.textContent = t.jsonSnapshot;
+        if (text.includes('Label nodo') || text.includes('Node label')) label.textContent = t.nodeLabel;
+        if (text.includes('Step') && text.includes('1')) label.textContent = t.stepLabel;
+        if (text.includes('Testo domanda') || text.includes('Question text')) label.textContent = t.questionText;
+        if (text.includes('supporto') || text.includes('Help')) label.textContent = t.supportText;
+        if (text.includes('Scelte') || text.includes('Choices')) label.textContent = t.choicesLabel;
+      });
+      
+      const smallTexts = document.querySelectorAll('.smallText');
+      smallTexts.forEach(st => {
+        const text = st.textContent.trim();
+        if (text.includes('localStorage')) st.textContent = t.caseDesc;
+        if (text.includes('soglia') || text.includes('threshold')) st.textContent = t.pocDesc;
+        if (text.includes('condizioni di stop') || text.includes('stop criteria')) st.textContent = t.stopCriteria;
+        if (text.includes('GitHub')) st.textContent = t.versionDesc;
+        if (text.includes('Regola:') || text.includes('Rule:')) st.textContent = t.ruleText;
+        if (text.includes('Nessuna scelta') || text.includes('No choice')) st.textContent = t.noChoiceYet;
+        if (text.includes('Percorso terminato') || text.includes('Path terminated')) st.textContent = t.pathTerminated;
+        if (text.includes('Tip:')) st.textContent = t.endTip;
+      });
+      
+      const meters = document.querySelectorAll('.meterTop b');
+      if (meters[0]) meters[0].textContent = t.fitAI;
+      if (meters[1]) meters[1].textContent = t.readiness;
+      if (meters[2]) meters[2].textContent = t.risk;
+      
+      $('#nodeTag').textContent = t.node;
+      $('#stepTag').textContent = t.step;
+      
+      const legendItems = document.querySelectorAll('.legend-item span');
+      if (legendItems[0]) legendItems[0].textContent = t.visited;
+      if (legendItems[1]) legendItems[1].textContent = t.current;
+      if (legendItems[2]) legendItems[2].textContent = t.notVisited;
+      
+      const statusBadge = $('#statusBadge');
+      if (statusBadge.textContent.includes('IN CORSO') || statusBadge.textContent.includes('IN PROGRESS')) {
+        statusBadge.textContent = t.inProgress;
+      } else if (statusBadge.textContent.includes('COMPLETATO') || statusBadge.textContent.includes('COMPLETED')) {
+        statusBadge.textContent = t.completed;
+      }
+      
+      $('#btnTheme').querySelector('span:last-child').textContent = t.theme;
+      $('#btnTreeViz').querySelector('span:last-child').textContent = t.tree;
+      $('#btnEditor').querySelector('span:last-child').textContent = t.editor;
+      $('#btnReset').querySelector('span:last-child').textContent = t.reset;
+      $('#btnExport').querySelector('span:last-child').textContent = t.exportJSON;
+      document.querySelector('label[for="fileImport"] span:last-child').textContent = t.importJSON;
+      $('#btnPrint').querySelector('span:last-child').textContent = t.print;
+      $('#btnCopyMemo').querySelector('span:last-child').textContent = t.copyMemo;
+      
+      $('#verdictTitle').textContent = t.provisionalVerdict;
+      if (state && !state.ending) {
+        $('#verdictText').textContent = t.completePathText;
+      }
+      
+      $('#savedPill').textContent = t.saved;
+      
+      const editorH3 = document.querySelector('#editorPanel h3');
+      if (editorH3) editorH3.textContent = t.editorNode;
+      
+      const btnAddNode = $('#btnAddNode');
+      if (btnAddNode) {
+        const textNode = Array.from(btnAddNode.childNodes).find(node => node.nodeType === 3);
+        if (textNode) textNode.textContent = t.addNode;
+      }
+      
+      const btnDuplicate = $('#btnDuplicateNode');
+      if (btnDuplicate) {
+        const textNode = Array.from(btnDuplicate.childNodes).find(node => node.nodeType === 3);
+        if (textNode) textNode.textContent = t.duplicate;
+      }
+      
+      const btnDelete = $('#btnDeleteNode');
+      if (btnDelete) {
+        const textNode = Array.from(btnDelete.childNodes).find(node => node.nodeType === 3);
+        if (textNode) textNode.textContent = t.deleteNode;
+      }
+      
+      const goNodeTags = document.querySelectorAll('#editorPanel .tag');
+      goNodeTags.forEach(tag => {
+        if (tag.textContent.includes('Vai al nodo') || tag.textContent.includes('Go to node')) {
+          tag.textContent = t.goToNode;
+        }
+      });
+      
+      const goNodeSearch = $('#goNodeSearch');
+      if (goNodeSearch) goNodeSearch.placeholder = t.goToNodePlaceholder;
+      
+      const btnGoNode = $('#btnGoNode');
+      if (btnGoNode) btnGoNode.textContent = t.go;
+      
+      const btnAddChoice = $('#btnAddChoice');
+      if (btnAddChoice) btnAddChoice.textContent = t.addChoice;
+      
+      const questionText = $('#questionText');
+      if (questionText && (questionText.textContent.includes('Percorso completato') || questionText.textContent.includes('Path completed'))) {
+        questionText.textContent = t.pathCompleted;
+      }
+      
+      const questionHelp = $('#questionHelp');
+      if (questionHelp && (questionHelp.textContent.includes('Hai terminato') || questionHelp.textContent.includes('You have completed'))) {
+        questionHelp.textContent = t.pathCompletedDesc;
+      }
+    }
+
+    function toggleLanguage() {
+      currentLang = currentLang === 'it' ? 'en' : 'it';
+      localStorage.setItem(LANG_KEY, currentLang);
+      
+      const btn = $('#langToggle');
+      btn.textContent = currentLang === 'it' ? '🇮🇹 IT' : '🇺🇸 EN';
+      btn.classList.toggle('active', currentLang === 'it');
+      
+      updateUILanguage();
+      
+      const t = LANG[currentLang];
+      showToast(t.languageActivated);
+    }
+
+    $('#langToggle').addEventListener('click', toggleLanguage);
+    // ========== END LANGUAGE TOGGLE ==========
+
+    $("#confThreshold").addEventListener("input",(e)=>{
+      state.params.confThreshold = parseInt(e.target.value,10)||80;
+      saveState(true);
+    });
+    $("#intentCount").addEventListener("input",(e)=>{
+      state.params.intentCount = parseInt(e.target.value,10)||10;
+      saveState(true);
+    });
+
+    ["#memoTitle","#memoProcess","#memoStake","#memoProblem","#memoReco","#memoRisks","#memoNext"].forEach(sel=>{
+      $(sel).addEventListener("input",(e)=>{
+        const field = sel.replace("#memo","").toLowerCase();
+        if(field==="stake") state.memo.stakeholders = e.target.value;
+        else if(field==="reco") state.memo.reco = e.target.value;
+        else if(field==="risks") state.memo.risks = e.target.value;
+        else if(field==="next") state.memo.next = e.target.value;
+        else state.memo[field] = e.target.value;
+        saveState(true);
+      });
+    });
+
+    window.addEventListener("DOMContentLoaded",()=>{
+      initTheme();
+      initCaseSelect();
+
+      const savedCase = localStorage.getItem(CASE_KEY) || Object.keys(TREES)[0];
+      const savedEditor = localStorage.getItem(EDITOR_KEY)==="1";
+      const savedViz = localStorage.getItem(VIZ_KEY)==="1";
+      
+      editorMode = savedEditor;
+      vizMode = savedViz;
+      
+      $("#editorPanel").style.display = editorMode?"block":"none";
+      $("#treeVizCard").style.display = vizMode?"block":"none";
+
+      switchCase(savedCase);
+      
+      if(vizMode) {
+        renderTreeVisualization();
+      }
+      
+      updateUILanguage();
+    });
+  </script>
+</body>
+</html>
