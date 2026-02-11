@@ -1,5 +1,5 @@
 **AI Decision Tree Builder**
-🌍 Live demo: https://ai-decision-tree.netlify.app 
+🌍 Live demo: https://surfab.github.io/ai-decision-tree/
 
 AI Decision Tree Builder is a single-page HTML/CSS/JS app to evaluate **if**, **when**, **and how to adopt AI **across different business processes, using guided decision trees and structured scoring ( **Fit/Readiness/Risk** ).
 
