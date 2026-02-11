@@ -3,7 +3,8 @@
 
 AI Decision Tree Builder is a single-page HTML/CSS/JS app to evaluate **if**, **when**, **and how to adopt AI **across different business processes, using guided decision trees and structured scoring ( **Fit/Readiness/Risk** ).
 
-![Screenshot](https://github.com/user-attachments/assets/7f3f33a0-99ec-4cb1-9c84-e618771c4f1a)
+![Screenshot](assets/ai_decision_tree_builder_path.jpg)
+
 
 **Key Features**
 
