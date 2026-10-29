@@ -39,11 +39,12 @@ c) The generated Decision Memo
 * 	**Innovation**, **digital**, and **data teams** looking for a repeatable framework to assess AI use cases.
 * 	**Consultants** who want a lightweight, offline, demo-friendly tool to use with clients.
 
-Roadmap (Future Ideas)
-	Path history and comparison across multiple use cases.
-	Full undo/redo for decisions.
-	Export tree as an image (PNG/SVG) for slides.
-	New vertical templates (finance, retail, healthcare, etc.)
+**Roadmap (Future Ideas)**
+
+* Path history and comparison across multiple use cases.
+* Full undo/redo for decisions.
+* Export tree as an image (PNG/SVG) for slides.
+* New vertical templates (finance, retail, healthcare, etc.)
 
 **License**
 
