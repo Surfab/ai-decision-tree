@@ -11,7 +11,7 @@ AI Decision Tree Builder is a single-page HTML/CSS/JS app to evaluate **if**, **
 * **Multi-use-case:** 3 built-in cases (email triage, HR screening, predictive maintenance), easily extensible.
 * **Numeric scoring**: Progressive calculation of Fit, Readiness, and Risk along the decision path.
 * 	**Node editor**: Live editing of the tree (texts, choices, scores, connections).
-* 	O**ffline-first**: Runs entirely locally in a single file, ai-decision-tree.html, with persistence via localStorage.
+* 	**Offline-first**: Runs entirely locally in a single file, index.html, with persistence via localStorage.
 * 	**Decision Memo**: Generates a board-ready memo including problem statement, recommendation, risks, and next steps.
 * 	**JSON export/import**: Snapshot of state and configuration, versionable in Git.
 * 	**Tree visualization**: Interactive graphical view of the decision tree, with the current path highlighted.
@@ -19,7 +19,7 @@ AI Decision Tree Builder is a single-page HTML/CSS/JS app to evaluate **if**, **
 
 **How to Use**
 
-1. Clone the repository or download ai-decision-tree.html.
+1. Clone the repository or download index.html.
 1. Open the file in a modern browser (Chrome, Edge, Firefox, Safari).
 1. 	Select a **case study** from the top-left menu.
 1. 	Answer the questions by following the decision tree.
@@ -47,4 +47,4 @@ Roadmap (Future Ideas)
 
 **License**
 
-MIT (or the license of your choice).
+MIT
