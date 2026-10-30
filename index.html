@@ -465,6 +465,7 @@
         <button class="btn small" id="btnPrint" title="Stampa o salva PDF (Print)"><span aria-hidden="true">⎙</span><span>Print</span></button>
 
         <button class="btn primary" id="btnCopyMemo" title="Copia Decision Memo"><span aria-hidden="true">⧉</span><span>Copia memo</span></button>
+        <button class="btn" id="btnClaudePrompt" title="Copia un prompt per far scrivere la memo a Claude (claude.ai)"><span aria-hidden="true">✦</span><span>Prompt per Claude</span></button>
       </div>
     </div>
 
@@ -2243,6 +2244,80 @@
 
     $("#btnPrint").addEventListener("click",()=> window.print());
 
+    // Prompt da incollare su claude.ai: Claude scrive la memo partendo solo da percorso e punteggi.
+    // Nessuna chiave API e nessuna chiamata dalla pagina: l'utente lo incolla dove vuole.
+    function buildClaudePrompt(){
+      const tree = TREES[activeCaseId];
+      const {fit, ready, risk} = state.score;
+      const v = currentVerdict();
+      const memo = {
+        title: $("#memoTitle").value.trim(),
+        process: $("#memoProcess").value.trim(),
+        stake: $("#memoStake").value.trim(),
+        problem: $("#memoProblem").value.trim()
+      };
+      const steps = state.path.map(p => {
+        const e = pathEntryText(p);
+        const q = tree.nodes[p.nodeId]?.q || e.node;
+        return `- ${e.node}: ${q} → ${e.choice}`;
+      });
+      const none = L("(nessuna risposta ancora)", "(no answers yet)");
+      const outcome = state.ending
+        ? `${v.title} (${tagLabel(v.tag)})`
+        : L(`percorso non completato, stima provvisoria: ${v.title}`, `path not completed, provisional estimate: ${v.title}`);
+
+      if (currentLang === "en") return [
+        "You are a consultant who writes Decision Memos for management.",
+        "Write a one-page memo on AI adoption for this case.",
+        "",
+        `Case: ${memo.title}`,
+        `Process: ${memo.process}`,
+        `Stakeholders: ${memo.stake}`,
+        `Problem: ${memo.problem}`,
+        "",
+        "Path through the decision tree (question → answer):",
+        ...(steps.length ? steps : [none]),
+        "",
+        `Final scores: Fit ${pct(fit)}%, Readiness ${pct(ready)}%, Risk ${pct(risk)}%`,
+        `Tree outcome: ${outcome}`,
+        `Confidence threshold for the PoC: ${confThreshold()}%`,
+        "",
+        "Rules:",
+        "- Use only the information above. If something is missing, write \"to be verified\".",
+        "- Structure: Recommendation (2 lines), Why (3 points tied to the answers),",
+        "  Risks and mitigations, Proposed PoC with KPIs and stop criteria.",
+        "- Direct tone, no jargon."
+      ].join("\n");
+
+      return [
+        "Sei un consulente che scrive Decision Memo per il management.",
+        "Scrivi una memo di una pagina sull'adozione dell'AI per questo caso.",
+        "",
+        `Case: ${memo.title}`,
+        `Processo: ${memo.process}`,
+        `Stakeholder: ${memo.stake}`,
+        `Problema: ${memo.problem}`,
+        "",
+        "Percorso nel decision tree (domanda → risposta):",
+        ...(steps.length ? steps : [none]),
+        "",
+        `Punteggi finali: Fit ${pct(fit)}%, Readiness ${pct(ready)}%, Rischio ${pct(risk)}%`,
+        `Esito del tree: ${outcome}`,
+        `Soglia di confidenza per il PoC: ${confThreshold()}%`,
+        "",
+        "Regole:",
+        "- Usa solo le informazioni sopra. Se manca un dato, scrivi \"da verificare\".",
+        "- Struttura: Raccomandazione (2 righe), Perché (3 punti legati alle risposte),",
+        "  Rischi e mitigazioni, PoC proposto con KPI e criteri di stop.",
+        "- Tono diretto, niente gergo."
+      ].join("\n");
+    }
+
+    $("#btnClaudePrompt").addEventListener("click", async () => {
+      await copyToClipboard(buildClaudePrompt());
+      showToast(L("Prompt copiato: incollalo su claude.ai", "Prompt copied: paste it into claude.ai"));
+    });
+
     $("#btnCopyMemo").addEventListener("click",()=>{
       copyToClipboard(buildMemoText());
     });
@@ -2314,6 +2389,8 @@
         importJSON: "Import JSON",
         print: "Print",
         copyMemo: "Copia memo",
+        claudePrompt: "Prompt per Claude",
+        claudePromptTitle: "Copia un prompt per far scrivere la memo a Claude (claude.ai)",
         provisionalVerdict: "Verdetto provvisorio",
         completePathText: "Completa il percorso, oppure modifica l'albero con Editor.",
         ruleText: "Regola: Fit alto + Readiness basso = \"AI possibile, ma non ora\". Fit alto + risk alto = \"AI sì, ma con guardrail\".",
@@ -2394,6 +2471,8 @@
         importJSON: "Import JSON",
         print: "Print",
         copyMemo: "Copy memo",
+        claudePrompt: "Prompt for Claude",
+        claudePromptTitle: "Copy a prompt to have Claude write the memo (claude.ai)",
         provisionalVerdict: "Provisional verdict",
         completePathText: "Complete the path, or edit the tree with Editor.",
         ruleText: "Rule: High Fit + Low Readiness = \"AI possible, but not now\". High Fit + high risk = \"AI yes, but with guardrails\".",
@@ -2497,6 +2576,8 @@
       document.querySelector('label[for="fileImport"] span:last-child').textContent = t.importJSON;
       $('#btnPrint').querySelector('span:last-child').textContent = t.print;
       $('#btnCopyMemo').querySelector('span:last-child').textContent = t.copyMemo;
+      $('#btnClaudePrompt').querySelector('span:last-child').textContent = t.claudePrompt;
+      $('#btnClaudePrompt').title = t.claudePromptTitle;
       
       if (state && !state.ending) {
         $('#verdictText').textContent = t.completePathText;
