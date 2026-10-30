@@ -16,7 +16,7 @@ AI Decision Tree Builder is a single-page HTML/CSS/JS app to evaluate **if**, **
 * 	**JSON export/import**: Snapshot of state and tree (including editor changes), versionable in Git.
 * 	**Tree visualization**: Interactive graphical view of the decision tree, with the current path highlighted.
 * 	**Print / PDF**: Layout optimized for printing or saving as PDF.
-* 	**Prompt for Claude**: Copies a ready-made prompt (case, path, scores, outcome) to paste into claude.ai, so Claude writes a memo grounded only in your answers. No API key needed.
+* 	**Prompt for Claude**: Opens claude.ai in a new tab with a ready-made prompt (case, path, scores, outcome), also copied to the clipboard, so Claude writes a memo grounded only in your answers. No API key needed.
 * 	**Italian / English**: Questions, choices, verdicts and the Decision Memo switch language with the IT/EN toggle. Trees you edited keep the text you wrote.
 
 **How to Use**

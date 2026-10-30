@@ -465,7 +465,7 @@
         <button class="btn small" id="btnPrint" title="Stampa o salva PDF (Print)"><span aria-hidden="true">⎙</span><span>Print</span></button>
 
         <button class="btn primary" id="btnCopyMemo" title="Copia Decision Memo"><span aria-hidden="true">⧉</span><span>Copia memo</span></button>
-        <button class="btn" id="btnClaudePrompt" title="Copia un prompt per far scrivere la memo a Claude (claude.ai)"><span aria-hidden="true">✦</span><span>Prompt per Claude</span></button>
+        <button class="btn" id="btnClaudePrompt" title="Apre claude.ai con un prompt per far scrivere la memo a Claude"><span aria-hidden="true">✦</span><span>Prompt per Claude</span></button>
       </div>
     </div>
 
@@ -2314,8 +2314,14 @@
     }
 
     $("#btnClaudePrompt").addEventListener("click", async () => {
-      await copyToClipboard(buildClaudePrompt());
-      showToast(L("Prompt copiato: incollalo su claude.ai", "Prompt copied: paste it into claude.ai"));
+      const prompt = buildClaudePrompt();
+      // Apre claude.ai con il prompt già compilato (?q=). La scheda va aperta subito,
+      // dentro il clic, altrimenti il browser la blocca come popup.
+      window.open(`https://claude.ai/new?q=${encodeURIComponent(prompt)}`, "_blank", "noopener");
+      // Copia anche negli appunti: se il campo arriva vuoto, basta incollare
+      await copyToClipboard(prompt);
+      showToast(L("Claude aperto in una nuova scheda. Se il campo è vuoto, incolla il prompt (Cmd+V)",
+                  "Claude opened in a new tab. If the box is empty, paste the prompt (Cmd+V)"));
     });
 
     $("#btnCopyMemo").addEventListener("click",()=>{
@@ -2390,7 +2396,7 @@
         print: "Print",
         copyMemo: "Copia memo",
         claudePrompt: "Prompt per Claude",
-        claudePromptTitle: "Copia un prompt per far scrivere la memo a Claude (claude.ai)",
+        claudePromptTitle: "Apre claude.ai con un prompt per far scrivere la memo a Claude",
         provisionalVerdict: "Verdetto provvisorio",
         completePathText: "Completa il percorso, oppure modifica l'albero con Editor.",
         ruleText: "Regola: Fit alto + Readiness basso = \"AI possibile, ma non ora\". Fit alto + risk alto = \"AI sì, ma con guardrail\".",
@@ -2472,7 +2478,7 @@
         print: "Print",
         copyMemo: "Copy memo",
         claudePrompt: "Prompt for Claude",
-        claudePromptTitle: "Copy a prompt to have Claude write the memo (claude.ai)",
+        claudePromptTitle: "Opens claude.ai with a prompt to have Claude write the memo",
         provisionalVerdict: "Provisional verdict",
         completePathText: "Complete the path, or edit the tree with Editor.",
         ruleText: "Rule: High Fit + Low Readiness = \"AI possible, but not now\". High Fit + high risk = \"AI yes, but with guardrails\".",
