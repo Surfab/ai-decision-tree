@@ -41,6 +41,18 @@ c) The generated Decision Memo
 * Once the path ends, the outcome reached in the tree decides the verdict: `END_GO` → GO, `END_NOT_YET` → NOT YET, `END_RISKY` → caution, `END_RULES` / `END_NO` → NO.
 * A GO reached with Risk above 60% becomes "AI yes, but with strong guardrails".
 
+**Fixed memo vs. Claude memo (real example)**
+
+Case: predictive maintenance. Path: downtime is costly → **Yes**, reliable telemetry and failure history → **Yes**, what happens when an alert fires → **Unclear**. Outcome: **NOT YET** (Fit 70%, Readiness 45%, Risk 45%).
+
+| | Built-in memo (text per verdict) | Memo written by Claude via "Prompt for Claude" |
+|---|---|---|
+| Recommendation | *"Before AI: clean up telemetry and failure history, define the alert → ticket → intervention workflow."* | *"Don't start a full AI project now. First define what happens when an alert arrives, then run a limited PoC on one critical asset at an 80% confidence threshold."* |
+| Tied to the answers? | No: it asks to clean up data the user just said is reliable | Yes: one point per answer, and it names the unclear alert workflow as the reason Readiness is at 45% |
+| Missing data | Not flagged | Marked "to be verified": cost per hour of downtime, failure baseline, acceptable false-alarm rate |
+
+The built-in memo is the same for every path that ends in the same verdict. The Claude memo follows the path, and the prompt's rules keep it from inventing numbers. The example memo was written in Italian; quotes are translated.
+
 **Who It’s For**
 
 * 	**Founders**, **C-level executives**, and **function heads** deciding where AI actually makes sense.
