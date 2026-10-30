@@ -990,16 +990,250 @@
     };
 
     // Verdetto quando il percorso è chiuso: comanda l'esito (END_*), non i punteggi.
-    const ENDING_VERDICTS = {
-      END_GO:      { badge:"good", title:"AI consigliata", tag:"GO" },
-      END_RISKY:   { badge:"warn", title:"AI possibile, ma troppo rischiosa così", tag:"ATTENZIONE" },
-      END_NOT_YET: { badge:"warn", title:"AI possibile, ma non ora", tag:"NOT YET" },
-      END_RULES:   { badge:"bad",  title:"Bastano regole e automazioni leggere", tag:"NO" },
-      END_NO:      { badge:"bad",  title:"AI non necessaria", tag:"NO" }
+    // Funzione e non costante: i titoli seguono la lingua attiva.
+    function endingVerdict(ending){
+      return {
+        END_GO:      { badge:"good", title:L("AI consigliata", "AI recommended"), tag:"GO" },
+        END_RISKY:   { badge:"warn", title:L("AI possibile, ma troppo rischiosa così", "AI possible, but too risky as is"), tag:"ATTENZIONE" },
+        END_NOT_YET: { badge:"warn", title:L("AI possibile, ma non ora", "AI possible, but not now"), tag:"NOT YET" },
+        END_RULES:   { badge:"bad",  title:L("Bastano regole e automazioni leggere", "Rules and light automation are enough"), tag:"NO" },
+        END_NO:      { badge:"bad",  title:L("AI non necessaria", "AI not needed"), tag:"NO" }
+      }[ending];
+    }
+
+    // Il tag resta la chiave interna (playbook); in inglese "ATTENZIONE" si mostra come "CAUTION"
+    function tagLabel(tag){ return tag === "ATTENZIONE" ? L("ATTENZIONE", "CAUTION") : tag; }
+
+    // Testi inglesi degli alberi: stessa struttura di TREES, solo i campi di testo.
+    // Le scelte sono [titolo, descrizione] nello stesso ordine dell'albero italiano.
+    const TREE_TEXT_EN = {
+      "email-triage-v2": {
+        title: "AI for After-Sales Email Triage",
+        defaults: {
+          process: "After-sales email handling: reading, classification, routing, data extraction",
+          stakeholders: "Customer Ops, IT/Digital, Compliance, Management",
+          problem: "High volume, unstructured content and manual sorting lead to slow response times, high operating costs and routing errors."
+        },
+        nodes: {
+          A: { label: "Node A", q: "Volume and repetition: do many similar cases arrive on a recurring basis?",
+               h: "If volumes are low or cases are unique, AI is often a cost, not an accelerator.",
+               choices: [["No", "Low volumes or non-repetitive cases"], ["Yes", "High volumes and recurring patterns"]] },
+          B: { label: "Node B", q: "Unstructured data: are free text and/or attachments (PDFs, images) common?",
+               h: "This is where AI helps: intent classification, field extraction, OCR, routing.",
+               choices: [["No", "Data is already structured"], ["Yes", "Free text and attachments are frequent"]] },
+          C: { label: "Node C", q: "Error impact: does wrong routing or extraction hurt SLAs, customers or compliance?",
+               h: "If high, you need human-in-the-loop and an audit log.",
+               choices: [["Low", "Errors are tolerable"], ["Medium", "Manageable with thresholds and fallback"], ["High", "High or regulatory risk"]] },
+          D: { label: "Node D", q: "Explainability: do decisions need to be justified (audit, customer, governance)?",
+               h: "In the enterprise, defensibility matters: logs, confidence, rationale, traceability.",
+               choices: [["No", "Explainability is not critical"], ["Yes", "Audit log and rationale required"]] },
+          E: { label: "Node E", q: "Readiness: are integrations (CRM/ticketing) and logging feasible right now?",
+               h: "Without integration it stays a demo. Plumbing first, then AI.",
+               choices: [["No", "Integrations not ready"], ["Yes", "Integrations and logging are feasible"]] },
+          F: { label: "Node F", q: "Rollout: how do you reduce risk and increase adoption?",
+               h: "A gradual rollout avoids a failed pilot and builds trust.",
+               choices: [["Controlled pilot", "Thresholds + human fallback + audit log"], ["Full automation", "End to end with no initial supervision"]] }
+        }
+      },
+      "hr-screening-v1": {
+        title: "AI for CV Pre-Screening (HR)",
+        defaults: {
+          process: "CV pre-screening: triage, evidence, shortlist",
+          stakeholders: "HR, Hiring Manager, Legal/Privacy, IT",
+          problem: "Too many CVs, slow shortlisting and inconsistency between reviewers, with bias and compliance risk."
+        },
+        nodes: {
+          A: { label: "Node A", q: "Volume: do you receive many CVs per role, repeatedly?",
+               h: "With few CVs, a standardized human process with clear criteria works better.",
+               choices: [["No", "Few CVs or occasional roles"], ["Yes", "Many CVs and recurring roles"]] },
+          B: { label: "Node B", q: "Criteria: are the screening criteria clear and documented?",
+               h: "If criteria are vague, AI amplifies confusion and bias.",
+               choices: [["No", "Criteria not formalized"], ["Yes", "Must-haves and nice-to-haves defined"]] },
+          C: { label: "Node C", q: "Risk: are legal constraints or bias concerns high (equality, GDPR, audit)?",
+               h: "If high, you need explainability and human-in-the-loop.",
+               choices: [["Low", "Internal use with minimal controls"], ["High", "Strong focus on bias and audit"]] },
+          D: { label: "Node D", q: "Data: do you have evaluation rubrics and a consistent decision history?",
+               h: "Without data, use AI as support with evidence, not as a hard ranking.",
+               choices: [["No", "Weak or inconsistent history"], ["Yes", "History and rubrics available"]] },
+          E: { label: "Node E", q: "Output: do you prefer triage with evidence or a pure ranking?",
+               h: "A pure ranking is risky. Triage with evidence is usually easier to defend.",
+               choices: [["Triage + evidence", "Suggests and cites reasons"], ["Ranking", "Ranks CVs automatically"]] },
+          F: { label: "Node F", q: "Governance: will you define guardrails and monitoring?",
+               h: "Thresholds, logs, human review and bias monitoring are needed to scale.",
+               choices: [["Yes", "Guardrails, logs, review and monitoring"], ["No", "No serious guardrails"]] }
+        }
+      },
+      "maintenance-v1": {
+        title: "AI for Predictive Maintenance (Industry)",
+        defaults: {
+          process: "Maintenance: preventing failures on critical assets",
+          stakeholders: "Operations, Maintenance, Engineering, IT/OT, Procurement",
+          problem: "Costly plant downtime and unoptimized maintenance, with sensor data available but underused."
+        },
+        nodes: {
+          A: { label: "Node A", q: "Downtime cost: does a plant stoppage have a significant economic impact?",
+               h: "If downtime is cheap, predictive maintenance may not pay off.",
+               choices: [["No", "Downtime is inexpensive"], ["Yes", "Downtime is costly"]] },
+          B: { label: "Node B", q: "Data: do you have reliable telemetry and failure history?",
+               h: "Without failure history, start with anomaly detection, not precise prediction.",
+               choices: [["No", "Incomplete or unclean data"], ["Yes", "Telemetry + failure history"]] },
+          C: { label: "Node C", q: "Action: what do you do when an alert signals failure risk?",
+               h: "Without a workflow, the AI is just a nice chart.",
+               choices: [["Unclear", "No defined workflow"], ["Clear", "Procedures and SLAs defined"]] },
+          D: { label: "Node D", q: "Risk: do false positives have a high impact (costs, unnecessary stops)?",
+               h: "Calibration and conservative thresholds are needed on critical assets.",
+               choices: [["Low", "False positives are tolerable"], ["High", "False positives are costly"]] },
+          E: { label: "Node E", q: "Integration: can the CMMS/ERP and maintenance ticketing be integrated?",
+               h: "You need to close the loop: alert → ticket → action → data feedback.",
+               choices: [["No", "Integration not ready"], ["Yes", "Integration is feasible"]] },
+          F: { label: "Node F", q: "Rollout: do you start with anomaly detection or failure prediction?",
+               h: "Teams often start with anomaly detection + rules, then evolve.",
+               choices: [["Anomaly detection", "A pragmatic start"], ["Direct prediction", "More value, more risk"]] }
+        }
+      }
     };
 
-    // Copia degli alberi originali, per "Ripristina albero"
+    const PLAYBOOKS_EN = {
+      "email-triage-v2": {
+        usesIntents: true,
+        reco: {
+          "GO": [
+            "Approach: AI with human-in-the-loop, routing, data extraction, audit log.",
+            "Rollout: gradual, routing first, then extraction, then partial automation."
+          ],
+          "NOT YET": [
+            "Before scaling AI: integrate ticketing/CRM, define a taxonomy, build a labeled dataset and logging.",
+            "Narrow pilot on 1-2 high-volume categories."
+          ],
+          "NO": [
+            "Don't adopt AI now: improve the process with standardization, rules and light automation.",
+            "Measure volumes and times for 4 weeks, then reassess."
+          ],
+          "ATTENZIONE": [
+            "Governance is required: thresholds, audit log, human fallback, error and drift monitoring.",
+            "Gradual rollout with clear stop criteria."
+          ]
+        },
+        risks: [
+          "Risk: noisy data or inconsistent labels.",
+          "Mitigation: 8–12 intent taxonomy, labeling guidelines, 'golden' dataset.",
+          "Risk: over-automation early on.",
+          "Mitigation: {conf}% confidence threshold + human fallback below it + audit log.",
+          "Risk: mismatch with the real process.",
+          "Mitigation: workshops with operators, exception mapping, adoption KPIs."
+        ],
+        next: [
+          "2-week PoC:",
+          "- Dataset: 500–1,000 real cases, labeled into 8–12 categories.",
+          "- KPIs: accuracy, turnaround time reduction, % human fallback, routing error rate, internal adoption.",
+          "- Guardrails: threshold, logs, critical classes always reviewed by a person.",
+          "- Stop criteria: if accuracy < X or turnaround time doesn't drop by at least Y%, stop or redesign."
+        ]
+      },
+      "hr-screening-v1": {
+        usesIntents: false,
+        reco: {
+          "GO": [
+            "Approach: AI as triage support, with evidence cited for each CV and the final decision always made by a person.",
+            "Rollout: one recurring role at a time, alongside the recruiter's shortlist."
+          ],
+          "NOT YET": [
+            "Before AI: formalize must-have/nice-to-have criteria and shared evaluation rubrics.",
+            "Collect 2-3 hiring cycles with documented decisions, then reassess."
+          ],
+          "NO": [
+            "Don't adopt AI now: with few CVs, a standardized human process with clear criteria works better.",
+            "Use shared scorecards across reviewers to reduce inconsistency."
+          ],
+          "ATTENZIONE": [
+            "Governance is required: no automatic ranking, human review of every rejection, bias monitoring.",
+            "Involve Legal/Privacy before the pilot: AI-based CV screening is a high-risk use under the EU AI Act."
+          ]
+        },
+        risks: [
+          "Risk: bias (gender, age, origin) inherited from past hiring decisions.",
+          "Mitigation: disparity tests on outputs, explicit criteria, sensitive data excluded.",
+          "Risk: suggestions that can't be explained to candidates or in an audit.",
+          "Mitigation: evidence cited for every suggestion + log of human decisions.",
+          "Risk: recruiters relying on the suggestion without checking it.",
+          "Mitigation: below {conf}% confidence the CV gets a full review, spot checks above the threshold too."
+        ],
+        next: [
+          "3-week PoC:",
+          "- Dataset: 200–300 CVs for 1-2 recurring roles, already assessed by recruiters.",
+          "- KPIs: agreement with the human shortlist, screening time per CV, % of CVs sent to full review, outcome differences between groups.",
+          "- Guardrails: no automatic rejection, evidence for every suggestion, decision log.",
+          "- Stop criteria: if agreement is < X or unexplained differences between groups emerge, stop or redesign."
+        ]
+      },
+      "maintenance-v1": {
+        usesIntents: false,
+        reco: {
+          "GO": [
+            "Approach: anomaly detection on critical assets, alerts integrated into the CMMS with conservative thresholds.",
+            "Rollout: one pilot asset family, then expand. Failure prediction comes when the history allows it."
+          ],
+          "NOT YET": [
+            "Before AI: clean up telemetry and failure history, define the alert → ticket → intervention workflow.",
+            "Integrate the CMMS/ERP: without closing the loop, the alert is just a chart."
+          ],
+          "NO": [
+            "Don't adopt AI now: with inexpensive downtime, preventive maintenance and threshold rules are enough.",
+            "Measure downtime and intervention costs for a quarter, then reassess."
+          ],
+          "ATTENZIONE": [
+            "Governance is required: thresholds calibrated per asset, review of false positives, technician feedback.",
+            "Gradual rollout with clear stop criteria."
+          ]
+        },
+        risks: [
+          "Risk: false positives that stop plants for no reason.",
+          "Mitigation: alerts only above {conf}% confidence, technician confirmation before any stop.",
+          "Risk: incomplete or unsynchronized sensor data.",
+          "Mitigation: automatic data quality checks, handling of offline sensors.",
+          "Risk: technicians ignoring alerts.",
+          "Mitigation: alerts inside the CMMS, feedback on the outcome of every intervention, adoption KPIs."
+        ],
+        next: [
+          "6–8 week PoC:",
+          "- Data: 6–12 months of telemetry and failure history on one family of critical assets.",
+          "- KPIs: failures anticipated, false positives per week, downtime hours avoided, alert-to-intervention time.",
+          "- Guardrails: conservative thresholds, technician confirmation before any stop, alert log.",
+          "- Stop criteria: if false positives exceed X per week or no failure is anticipated, stop or redesign."
+        ]
+      }
+    };
+
+    // Alberi originali in italiano, per "Albero originale" e per la traduzione
     const DEFAULT_TREES = JSON.parse(JSON.stringify(TREES));
+
+    // Albero di default di un case nella lingua richiesta
+    function localizedDefaultTree(caseId, lang){
+      const tree = JSON.parse(JSON.stringify(DEFAULT_TREES[caseId]));
+      const en = lang === "en" && TREE_TEXT_EN[caseId];
+      if (!en) return tree;
+      tree.title = en.title;
+      Object.assign(tree.defaults, en.defaults);
+      Object.entries(en.nodes).forEach(([id, txt]) => {
+        const node = tree.nodes[id];
+        if (!node) return;
+        node.label = txt.label; node.q = txt.q; node.h = txt.h;
+        (node.choices || []).forEach((ch, i) => {
+          if (txt.choices[i]) [ch.t, ch.d] = txt.choices[i];
+        });
+      });
+      return tree;
+    }
+
+    // Testo nella lingua attiva, per i messaggi brevi
+    function L(it, en){ return currentLang === "en" ? en : it; }
+
+    // Esegue fn come se la lingua attiva fosse lang (serve a riconoscere i testi generati nell'altra lingua)
+    function withLang(lang, fn){
+      const prev = currentLang;
+      currentLang = lang;
+      try { return fn(); } finally { currentLang = prev; }
+    }
 
     const APP = "AI Decision Tree Builder (Editor + Visualizer)";
     const THEME_KEY = "aidt_theme_editor_v1";
@@ -1089,14 +1323,50 @@
 
     function saveState(silent=false){
       localStorage.setItem(storageKeyForCase(activeCaseId), JSON.stringify(state));
-      $("#savedPill").textContent = "Salvato localmente";
-      if (!silent) showToast("Salvato");
+      $("#savedPill").textContent = LANG[currentLang].saved;
+      if (!silent) showToast(L("Salvato", "Saved"));
       renderJsonPreview();
     }
 
     function isValidTree(tree){
       return !!(tree && typeof tree === "object" && tree.nodes && typeof tree.nodes === "object"
         && tree.nodes[tree.start] && tree.defaults);
+    }
+
+    // Gli alberi non modificati con l'editor seguono la lingua attiva;
+    // quelli salvati dall'editor restano come l'utente li ha scritti.
+    function syncTreesLanguage(){
+      Object.keys(DEFAULT_TREES).forEach(caseId => {
+        if (!localStorage.getItem(treeKeyForCase(caseId))) {
+          TREES[caseId] = localizedDefaultTree(caseId, currentLang);
+        }
+      });
+      document.querySelectorAll("#caseSelect option").forEach(opt => {
+        if (TREES[opt.value]) opt.textContent = TREES[opt.value].title;
+      });
+    }
+
+    // Traduce i campi della memo rimasti come generati dall'app nell'altra lingua.
+    // Un campo modificato a mano non corrisponde più al testo generato e resta com'è.
+    function syncMemoLanguage(){
+      const other = currentLang === "en" ? "it" : "en";
+      const otherTree = localizedDefaultTree(activeCaseId, other);
+      const curTree = localizedDefaultTree(activeCaseId, currentLang);
+      const defaults = {
+        title: [otherTree.title, curTree.title],
+        process: [otherTree.defaults.process, curTree.defaults.process],
+        stakeholders: [otherTree.defaults.stakeholders, curTree.defaults.stakeholders],
+        problem: [otherTree.defaults.problem, curTree.defaults.problem]
+      };
+      Object.entries(defaults).forEach(([f, [oldText, newText]]) => {
+        if (state.memo[f] === oldText) state.memo[f] = newText;
+      });
+      if (state.path.length){
+        const builders = { reco: buildRecoText, risks: buildRisksText, next: buildNextText };
+        Object.entries(builders).forEach(([f, build]) => {
+          if (state.memo[f] && state.memo[f] === withLang(other, build)) state.memo[f] = build();
+        });
+      }
     }
 
     function loadSavedTrees(){
@@ -1116,32 +1386,32 @@
     function pct(n){ return clamp(Math.round(n), 0, 100); }
 
     function verdictFromScores(fit, ready, risk){
-      if (fit < 55) return { badge:"bad", title:"AI non necessaria", tag:"NO" };
+      if (fit < 55) return { badge:"bad", title:L("AI non necessaria", "AI not needed"), tag:"NO" };
 
       const highRisk = risk > 70;
       const strong = (fit >= 70 && ready >= 60);
 
-      if (strong && risk <= 60) return { badge:"good", title:"AI consigliata", tag:"GO" };
-      if (highRisk) return { badge:"warn", title:"AI possibile, ma troppo rischiosa così", tag:"ATTENZIONE" };
-      if (fit >= 65 && ready < 60) return { badge:"warn", title:"AI possibile, ma non ora", tag:"NOT YET" };
-      if (strong && risk > 60) return { badge:"warn", title:"AI sì, ma con guardrail forti", tag:"ATTENZIONE" };
-
-      return { badge:"warn", title:"Valutazione mista, serve approfondimento", tag:"ATTENZIONE" };
+      if (strong && risk <= 60) return { badge:"good", title:L("AI consigliata", "AI recommended"), tag:"GO" };
+      if (highRisk) return { badge:"warn", title:L("AI possibile, ma troppo rischiosa così", "AI possible, but too risky as is"), tag:"ATTENZIONE" };
+      if (fit >= 65 && ready < 60) return { badge:"warn", title:L("AI possibile, ma non ora", "AI possible, but not now"), tag:"NOT YET" };
+      if (strong && risk > 60) return { badge:"warn", title:L("AI sì, ma con guardrail forti", "AI yes, but with strong guardrails"), tag:"ATTENZIONE" };
+      return { badge:"warn", title:L("Valutazione mista, serve approfondimento", "Mixed assessment, needs a closer look"), tag:"ATTENZIONE" };
     }
 
     // Verdetto corrente: a percorso chiuso vale l'esito, durante il percorso è una stima dai punteggi.
     function currentVerdict(){
       const {fit, ready, risk} = state.score;
-      const byEnding = ENDING_VERDICTS[state.ending];
+      const byEnding = endingVerdict(state.ending);
       if (!byEnding) return verdictFromScores(fit, ready, risk);
       if (state.ending === "END_GO" && risk > 60){
-        return { badge:"warn", title:"AI sì, ma con guardrail forti", tag:"ATTENZIONE" };
+        return { badge:"warn", title:L("AI sì, ma con guardrail forti", "AI yes, but with strong guardrails"), tag:"ATTENZIONE" };
       }
       return byEnding;
     }
 
     function playbook(){
-      return PLAYBOOKS[activeCaseId] || PLAYBOOKS["email-triage-v2"];
+      const books = currentLang === "en" ? PLAYBOOKS_EN : PLAYBOOKS;
+      return books[activeCaseId] || books["email-triage-v2"];
     }
 
     function confThreshold(){
@@ -1156,11 +1426,11 @@
       const intents = clamp(parseInt(state.params.intentCount,10)||10, 4, 20);
 
       const base = [
-        `Verdetto: ${v.title}.`,
-        `Punteggi: Fit ${pct(fit)}%, Readiness ${pct(ready)}%, Rischio ${pct(risk)}%.`,
+        `${L("Verdetto", "Verdict")}: ${v.title}.`,
+        `${L("Punteggi", "Scores")}: Fit ${pct(fit)}%, Readiness ${pct(ready)}%, ${L("Rischio", "Risk")} ${pct(risk)}%.`,
         pb.usesIntents
-          ? `Parametri PoC: soglia confidenza ${conf}%, intent target ${intents}.`
-          : `Parametri PoC: soglia confidenza ${conf}%.`
+          ? L(`Parametri PoC: soglia confidenza ${conf}%, intent target ${intents}.`, `PoC parameters: confidence threshold ${conf}%, target intents ${intents}.`)
+          : L(`Parametri PoC: soglia confidenza ${conf}%.`, `PoC parameters: confidence threshold ${conf}%.`)
       ];
       base.push(...(pb.reco[v.tag] || pb.reco["ATTENZIONE"]));
       return base.join("\n");
@@ -1170,13 +1440,20 @@
       const conf = confThreshold();
       const lines = playbook().risks.map(l => l.replace("{conf}", conf));
       if (state.score.risk >= 70){
-        lines.unshift("Rischio elevato: human-in-the-loop obbligatorio sui casi critici e governance formale.");
+        lines.unshift(L("Rischio elevato: human-in-the-loop obbligatorio sui casi critici e governance formale.",
+                        "High risk: mandatory human-in-the-loop on critical cases and formal governance."));
       }
       return lines.join("\n");
     }
 
     function buildNextText(){
       return playbook().next.join("\n");
+    }
+
+    function pathEntryText(p){
+      const node = TREES[activeCaseId]?.nodes[p.nodeId];
+      const choice = node?.choices?.find(ch => ch.k === p.choiceKey);
+      return { node: node?.label || p.nodeLabel, choice: choice?.t || p.choiceTitle };
     }
 
     function buildMemoText(){
@@ -1188,28 +1465,28 @@
       const risks = $("#memoRisks").value.trim();
       const next = $("#memoNext").value.trim();
 
-      const path = state.path.map(p => `${p.nodeLabel}: ${p.choiceTitle}`).join(" | ");
+      const path = state.path.map(p => { const e = pathEntryText(p); return `${e.node}: ${e.choice}`; }).join(" | ");
 
       return [
         `${title}`,
         ``,
-        `Processo: ${proc}`,
+        `${L("Processo", "Process")}: ${proc}`,
         `Stakeholder: ${stake}`,
         ``,
-        `Problema:`,
+        `${L("Problema", "Problem")}:`,
         `${prob}`,
         ``,
-        `Percorso decisionale:`,
-        `${path || "(non completato)"}`,
+        `${L("Percorso decisionale", "Decision path")}:`,
+        `${path || L("(non completato)", "(not completed)")}`,
         ``,
-        `Raccomandazione:`,
-        `${reco || "(in corso)"}`,
+        `${L("Raccomandazione", "Recommendation")}:`,
+        `${reco || L("(in corso)", "(in progress)")}`,
         ``,
-        `Rischi e mitigazioni:`,
-        `${risks || "(in corso)"}`,
+        `${L("Rischi e mitigazioni", "Risks and mitigations")}:`,
+        `${risks || L("(in corso)", "(in progress)")}`,
         ``,
-        `Prossimo step:`,
-        `${next || "(in corso)"}`
+        `${L("Prossimo step", "Next step")}:`,
+        `${next || L("(in corso)", "(in progress)")}`
       ].join("\n");
     }
 
@@ -1226,7 +1503,7 @@
     async function copyToClipboard(text){
       try{
         await navigator.clipboard.writeText(text);
-        showToast("Copiato negli appunti");
+        showToast(L("Copiato negli appunti", "Copied to clipboard"));
       }catch(e){
         const ta = document.createElement("textarea");
         ta.value = text;
@@ -1234,7 +1511,7 @@
         ta.select();
         document.execCommand("copy");
         ta.remove();
-        showToast("Copiato (fallback)");
+        showToast(L("Copiato (fallback)", "Copied (fallback)"));
       }
     }
 
@@ -1256,7 +1533,7 @@
 
       // Con l'editor si può scrivere un "next" che non esiste: non avanzare su un nodo vuoto
       if (!next.startsWith("END_") && !tree.nodes[next]){
-        showToast(next ? `Il nodo "${next}" non esiste` : "Questa scelta non ha un nodo successivo");
+        showToast(next ? L(`Il nodo "${next}" non esiste`, `Node "${next}" does not exist`) : L("Questa scelta non ha un nodo successivo", "This choice has no next node"));
         return;
       }
 
@@ -1303,19 +1580,20 @@
       saveState();
       if (editorMode) loadEditorForNode(state.current);
       render();
-      showToast("Reset completato");
+      showToast(L("Reset completato", "Reset complete"));
     }
 
     function render(){
       const tree = TREES[activeCaseId];
       
       if(state.ending){
-        $("#nodeTag").textContent = "FINE";
-        $("#stepTag").textContent = "Completato";
-        $("#questionText").textContent = "Percorso completato!";
-        $("#questionHelp").textContent = "Hai terminato il percorso decisionale. Rivedi il verdetto e la memo.";
-        $("#choices").innerHTML = '<div class="smallText">Percorso terminato. Puoi resettare o cambiare case.</div>';
-        $("#statusBadge").textContent = "COMPLETATO";
+        const t = LANG[currentLang];
+        $("#nodeTag").textContent = t.end;
+        $("#stepTag").textContent = t.completedStep;
+        $("#questionText").textContent = t.pathCompleted;
+        $("#questionHelp").textContent = t.pathCompletedDesc;
+        $("#choices").innerHTML = `<div class="smallText">${escapeHtml(t.pathTerminated)}</div>`;
+        $("#statusBadge").textContent = t.completed;
         $("#statusBadge").className = "badge good";
       }else{
         const node = currentNode();
@@ -1333,7 +1611,7 @@
         });
         $("#choices").innerHTML = html;
 
-        $("#statusBadge").textContent = "IN CORSO";
+        $("#statusBadge").textContent = LANG[currentLang].inProgress;
         $("#statusBadge").className = "badge warn";
       }
 
@@ -1347,14 +1625,15 @@
 
       let pathHtml = '';
       state.path.forEach(p => {
-        pathHtml += `<div class="chip"><b>${escapeHtml(p.nodeLabel)}</b>: ${escapeHtml(p.choiceTitle)}</div>`;
+        const e = pathEntryText(p);
+        pathHtml += `<div class="chip"><b>${escapeHtml(e.node)}</b>: ${escapeHtml(e.choice)}</div>`;
       });
-      $("#pathChips").innerHTML = pathHtml || '<div class="smallText">Nessuna scelta ancora.</div>';
+      $("#pathChips").innerHTML = pathHtml || `<div class="smallText">${escapeHtml(LANG[currentLang].noChoiceYet)}</div>`;
 
       const v = currentVerdict();
       $("#verdictTitle").textContent = v.title;
-      $("#verdictText").textContent = state.ending ? "Percorso completato. Rivedi la Decision Memo." : "Completa il percorso per vedere il verdetto finale.";
-      $("#verdictBadge").textContent = v.tag;
+      $("#verdictText").textContent = state.ending ? LANG[currentLang].pathCompletedMemo : LANG[currentLang].completeForFinal;
+      $("#verdictBadge").textContent = tagLabel(v.tag);
       $("#verdictBadge").className = `badge ${v.badge}`;
 
       renderJsonPreview();
@@ -1450,7 +1729,7 @@
           if (!node.id.startsWith('END_')) {
             state.current = node.id;
             render();
-            showToast(`Navigato a ${node.label || node.id}`);
+            showToast(L(`Navigato a ${node.label || node.id}`, `Moved to ${node.label || node.id}`));
           }
         });
         
@@ -1678,6 +1957,7 @@
 
       const existing = loadState(caseId);
       state = existing || defaultState(caseId);
+      syncMemoLanguage();
 
       $("#caseSelect").value = caseId;
       $("#memoTitle").value = state.memo.title;
@@ -1714,7 +1994,7 @@
       localStorage.setItem(EDITOR_KEY, editorMode?"1":"0");
       $("#editorPanel").style.display = editorMode ? "block" : "none";
       if(editorMode) loadEditorForNode(state.current);
-      showToast(editorMode ? "Editor attivato" : "Editor disattivato");
+      showToast(editorMode ? L("Editor attivato", "Editor on") : L("Editor disattivato", "Editor off"));
     }
 
     function toggleTreeViz(){
@@ -1723,9 +2003,9 @@
       $("#treeVizCard").style.display = vizMode ? "block" : "none";
       if(vizMode) {
         renderTreeVisualization();
-        showToast("Visualizzazione albero attivata");
+        showToast(L("Visualizzazione albero attivata", "Tree view on"));
       } else {
-        showToast("Visualizzazione albero disattivata");
+        showToast(L("Visualizzazione albero disattivata", "Tree view off"));
       }
     }
 
@@ -1749,8 +2029,8 @@
       choices.forEach((ch,idx)=>{
         html += `
           <div class="row" style="grid-template-columns: 1fr 1fr .8fr .4fr .4fr .4fr; gap:6px; margin-bottom:8px;">
-            <input placeholder="Titolo (es: Sì)" value="${escapeHtml(ch.t||"")}" data-idx="${idx}" data-field="t" class="edit-choice-input" />
-            <input placeholder="Descrizione" value="${escapeHtml(ch.d||"")}" data-idx="${idx}" data-field="d" class="edit-choice-input" />
+            <input placeholder="${escapeHtml(L("Titolo (es: Sì)", "Title (e.g. Yes)"))}" value="${escapeHtml(ch.t||"")}" data-idx="${idx}" data-field="t" class="edit-choice-input" />
+            <input placeholder="${escapeHtml(L("Descrizione", "Description"))}" value="${escapeHtml(ch.d||"")}" data-idx="${idx}" data-field="d" class="edit-choice-input" />
             <input placeholder="Next (es: B)" value="${escapeHtml(ch.n||"")}" data-idx="${idx}" data-field="n" class="edit-choice-input" />
             <input type="number" placeholder="Fit" value="${ch.s?.fit||0}" data-idx="${idx}" data-field="s.fit" class="edit-choice-input" style="width:100%;" />
             <input type="number" placeholder="Ready" value="${ch.s?.ready||0}" data-idx="${idx}" data-field="s.ready" class="edit-choice-input" style="width:100%;" />
@@ -1828,20 +2108,20 @@
       if (!parent) return;
       const id = newNodeId(tree);
       tree.nodes[id] = {
-        label: `Nodo ${id}`, step: Math.min((parent.step || 1) + 1, 6),
-        q: "Nuova domanda", h: "",
+        label: L(`Nodo ${id}`, `Node ${id}`), step: Math.min((parent.step || 1) + 1, 6),
+        q: L("Nuova domanda", "New question"), h: "",
         choices: [
-          {k:"yes", t:"Sì", d:"", n:"END_GO", s:{fit:0, ready:0, risk:0}},
+          {k:"yes", t:L("Sì", "Yes"), d:"", n:"END_GO", s:{fit:0, ready:0, risk:0}},
           {k:"no",  t:"No", d:"", n:"END_NO", s:{fit:0, ready:0, risk:0}}
         ]
       };
       // collega il nuovo nodo al nodo aperto con una nuova scelta
       parent.choices = parent.choices || [];
-      parent.choices.push({k:`to_${id}`, t:`Vai a ${id}`, d:"", n:id, s:{fit:0, ready:0, risk:0}});
+      parent.choices.push({k:`to_${id}`, t:L(`Vai a ${id}`, `Go to ${id}`), d:"", n:id, s:{fit:0, ready:0, risk:0}});
       saveTree();
       loadEditorForNode(id);
       render();
-      showToast(`Nodo ${id} creato e collegato`);
+      showToast(L(`Nodo ${id} creato e collegato`, `Node ${id} created and linked`));
     }
 
     function duplicateNode(){
@@ -1850,23 +2130,24 @@
       if (!src) return;
       const id = newNodeId(tree);
       tree.nodes[id] = JSON.parse(JSON.stringify(src));
-      tree.nodes[id].label = `${src.label || editNodeId} (copia)`;
+      tree.nodes[id].label = `${src.label || editNodeId} ${L("(copia)", "(copy)")}`;
       saveTree();
       loadEditorForNode(id);
       render();
-      showToast(`Nodo duplicato come ${id} (non ancora collegato)`);
+      showToast(L(`Nodo duplicato come ${id} (non ancora collegato)`, `Node duplicated as ${id} (not linked yet)`));
     }
 
     function deleteNode(){
       const tree = TREES[activeCaseId];
       const id = editNodeId;
       if (!tree.nodes[id]) return;
-      if (id === tree.start){ showToast("Il nodo iniziale non si può eliminare"); return; }
+      if (id === tree.start){ showToast(L("Il nodo iniziale non si può eliminare", "The start node can't be deleted")); return; }
       const incoming = Object.values(tree.nodes).reduce((n, node) =>
         n + (node.choices || []).filter(ch => ch.n === id).length, 0);
       const msg = incoming
-        ? `Eliminare il nodo ${id}? Verranno rimosse anche ${incoming} scelte che portano qui.`
-        : `Eliminare il nodo ${id}?`;
+        ? L(`Eliminare il nodo ${id}? Verranno rimosse anche ${incoming} scelte che portano qui.`,
+            `Delete node ${id}? ${incoming} choices leading here will be removed too.`)
+        : L(`Eliminare il nodo ${id}?`, `Delete node ${id}?`);
       if (!confirm(msg)) return;
       delete tree.nodes[id];
       Object.values(tree.nodes).forEach(node => {
@@ -1877,12 +2158,13 @@
       if (state.current === id || state.path.some(p => p.nodeId === id)) resetCase();
       loadEditorForNode(tree.nodes[state.current] ? state.current : tree.start);
       render();
-      showToast(`Nodo ${id} eliminato`);
+      showToast(L(`Nodo ${id} eliminato`, `Node ${id} deleted`));
     }
 
     function resetTree(){
-      if (!confirm("Ripristinare l'albero originale di questo case? Le modifiche dell'editor andranno perse e il percorso riparte.")) return;
-      TREES[activeCaseId] = JSON.parse(JSON.stringify(DEFAULT_TREES[activeCaseId]));
+      if (!confirm(L("Ripristinare l'albero originale di questo case? Le modifiche dell'editor andranno perse e il percorso riparte.",
+                     "Restore this case's original tree? Editor changes will be lost and the path restarts."))) return;
+      TREES[activeCaseId] = localizedDefaultTree(activeCaseId, currentLang);
       localStorage.removeItem(treeKeyForCase(activeCaseId));
       resetCase();
       loadEditorForNode(state.current);
@@ -1903,7 +2185,7 @@
       const node = tree.nodes[editNodeId];
       if(!node) return;
       if(!node.choices) node.choices=[];
-      node.choices.push({k:`choice${node.choices.length}`, t:"Nuova scelta", d:"", n:"", s:{fit:0,ready:0,risk:0}});
+      node.choices.push({k:`choice${node.choices.length}`, t:L("Nuova scelta", "New choice"), d:"", n:"", s:{fit:0,ready:0,risk:0}});
       saveTree();
       loadEditorForNode(editNodeId);
     });
@@ -1911,7 +2193,7 @@
     $("#btnTheme").addEventListener("click",()=>{
       const current = document.documentElement.getAttribute("data-theme");
       setTheme(current==="dark"?"light":"dark");
-      showToast(`Tema: ${current==="dark"?"light":"dark"}`);
+      showToast(`${L("Tema", "Theme")}: ${current==="dark"?"light":"dark"}`);
     });
 
     $("#btnTreeViz").addEventListener("click", toggleTreeViz);
@@ -1921,7 +2203,7 @@
     $("#btnExport").addEventListener("click",()=>{
       const payload = { meta: {app: APP, exportedAt: new Date().toISOString()}, state, trees: TREES };
       download(`aidt-${activeCaseId}-${Date.now()}.json`, JSON.stringify(payload, null, 2));
-      showToast("JSON esportato");
+      showToast(L("JSON esportato", "JSON exported"));
     });
 
     $("#fileImport").addEventListener("change",(e)=>{
@@ -1946,7 +2228,7 @@
           switchCase(caseId);
           showToast(LANG[currentLang].stateImported);
         }catch(err){
-          showToast("Errore import JSON");
+          showToast(LANG[currentLang].importError);
         }
       };
       reader.readAsText(file);
@@ -1977,6 +2259,8 @@
         pocParams: "Parametri PoC",
         pocDesc: "Sinistra: soglia confidenza %, destra: numero intent target.",
         pocDescNoIntent: "Soglia di confidenza %: sotto soglia decide una persona.",
+        completeForFinal: "Completa il percorso per vedere il verdetto finale.",
+        resetTree: "↺ Albero originale",
         end: "FINE",
         completedStep: "Completato",
         node: "Nodo",
@@ -2055,6 +2339,8 @@
         pocParams: "PoC Parameters",
         pocDesc: "Left: confidence threshold %, right: target intent count.",
         pocDescNoIntent: "Confidence threshold %: below it, a person decides.",
+        completeForFinal: "Complete the path to see the final verdict.",
+        resetTree: "↺ Original tree",
         end: "END",
         completedStep: "Completed",
         node: "Node",
@@ -2243,6 +2529,9 @@
       const goNodeSearch = $('#goNodeSearch');
       if (goNodeSearch) goNodeSearch.placeholder = t.goToNodePlaceholder;
       
+      const btnResetTree = $('#btnResetTree');
+      if (btnResetTree) btnResetTree.textContent = t.resetTree;
+      
       const btnGoNode = $('#btnGoNode');
       if (btnGoNode) btnGoNode.textContent = t.go;
       
@@ -2263,6 +2552,10 @@
     function toggleLanguage() {
       currentLang = currentLang === 'it' ? 'en' : 'it';
       localStorage.setItem(LANG_KEY, currentLang);
+      document.documentElement.lang = currentLang;
+      syncTreesLanguage();
+      switchCase(activeCaseId); // ricarica nodo, memo e verdetto nella nuova lingua
+      saveState(true);
       
       const btn = $('#langToggle');
       btn.textContent = currentLang === 'it' ? '🇮🇹 IT' : '🇺🇸 EN';
@@ -2303,6 +2596,8 @@
       initCaseSelect();
 
       loadSavedTrees();
+      document.documentElement.lang = currentLang;
+      syncTreesLanguage();
       const storedCase = localStorage.getItem(CASE_KEY);
       const savedCase = TREES[storedCase] ? storedCase : Object.keys(TREES)[0];
       const savedEditor = localStorage.getItem(EDITOR_KEY)==="1";
