@@ -12,7 +12,7 @@ AI Decision Tree Builder is a single-page HTML/CSS/JS app to evaluate **if**, **
 * **Numeric scoring**: Progressive calculation of Fit, Readiness, and Risk along the decision path.
 * 	**Node editor**: Live editing of the tree (texts, choices, scores, connections): add, duplicate, delete and jump to nodes. Edits are saved per case and can be reverted to the original tree.
 * 	**Offline-first**: Runs entirely locally in a single file, index.html, with persistence via localStorage.
-* 	**Decision Memo**: Generates a board-ready memo including problem statement, recommendation, risks, and next steps, with case-specific content (email triage, HR, maintenance).
+* 	**Decision Memo**: Builds a draft (verdict, scores, your answers, typical risks and PoC outline for the case). For the full board-ready memo tied to your answers, use **Prompt for Claude**.
 * 	**JSON export/import**: Snapshot of state and tree (including editor changes), versionable in Git.
 * 	**Tree visualization**: Interactive graphical view of the decision tree, with the current path highlighted.
 * 	**Print / PDF**: Layout optimized for printing or saving as PDF.
@@ -51,7 +51,7 @@ Case: predictive maintenance. Path: downtime is costly → **Yes**, reliable tel
 | Tied to the answers? | No: it asks to clean up data the user just said is reliable | Yes: one point per answer, and it names the unclear alert workflow as the reason Readiness is at 45% |
 | Missing data | Not flagged | Marked "to be verified": cost per hour of downtime, failure baseline, acceptable false-alarm rate |
 
-The built-in memo is the same for every path that ends in the same verdict. The Claude memo follows the path, and the prompt's rules keep it from inventing numbers. The example memo was written in Italian; quotes are translated.
+The built-in memo was the same for every path that ends in the same verdict. Since then it has become a short draft that only restates the verdict, the scores and your answers; the full memo is left to Claude. The Claude memo follows the path, and the prompt's rules keep it from inventing numbers. The example memo was written in Italian; quotes are translated.
 
 **Who It’s For**
 
@@ -68,6 +68,7 @@ The built-in memo is the same for every path that ends in the same verdict. The 
 
 **Changelog**
 
+* **October 2026 (4)**: the built-in memo is now a draft grounded in your answers (no more generic advice per verdict that could contradict them); the full memo is left to Claude.
 * **October 2026 (3)**: "Prompt for Claude" button (IT/EN); no more horizontal scroll on phones.
 * **October 2026 (2)**: full English version of the three trees, verdicts, memo and messages.
 * **October 2026**: the verdict follows the path outcome (it could show GO on a "not yet" path); working node editor buttons (add, duplicate, delete, go to node) and saved edits; JSON import fixed; case-specific memo for HR and maintenance; fixes to the IT/EN toggle and to memo persistence on reload.
