@@ -10,10 +10,10 @@ AI Decision Tree Builder is a single-page HTML/CSS/JS app to evaluate **if**, **
 
 * **Multi-use-case:** 3 built-in cases (email triage, HR screening, predictive maintenance), easily extensible.
 * **Numeric scoring**: Progressive calculation of Fit, Readiness, and Risk along the decision path.
-* 	**Node editor**: Live editing of the tree (texts, choices, scores, connections).
+* 	**Node editor**: Live editing of the tree (texts, choices, scores, connections): add, duplicate, delete and jump to nodes. Edits are saved per case and can be reverted to the original tree.
 * 	**Offline-first**: Runs entirely locally in a single file, index.html, with persistence via localStorage.
-* 	**Decision Memo**: Generates a board-ready memo including problem statement, recommendation, risks, and next steps.
-* 	**JSON export/import**: Snapshot of state and configuration, versionable in Git.
+* 	**Decision Memo**: Generates a board-ready memo including problem statement, recommendation, risks, and next steps, with case-specific content (email triage, HR, maintenance).
+* 	**JSON export/import**: Snapshot of state and tree (including editor changes), versionable in Git.
 * 	**Tree visualization**: Interactive graphical view of the decision tree, with the current path highlighted.
 * 	**Print / PDF**: Layout optimized for printing or saving as PDF.
 
@@ -33,6 +33,12 @@ c) The generated Decision Memo
 
 >>> Use the Editor to adapt the tree to your context (nodes, copy, weights, outcomes). 
 
+**How the Verdict Works**
+
+* While you answer, the verdict is a provisional estimate from the Fit / Readiness / Risk scores.
+* Once the path ends, the outcome reached in the tree decides the verdict: `END_GO` → GO, `END_NOT_YET` → NOT YET, `END_RISKY` → caution, `END_RULES` / `END_NO` → NO.
+* A GO reached with Risk above 60% becomes "AI yes, but with strong guardrails".
+
 **Who It’s For**
 
 * 	**Founders**, **C-level executives**, and **function heads** deciding where AI actually makes sense.
@@ -45,6 +51,10 @@ c) The generated Decision Memo
 * Full undo/redo for decisions.
 * Export tree as an image (PNG/SVG) for slides.
 * New vertical templates (finance, retail, healthcare, etc.)
+
+**Changelog**
+
+* **October 2026**: the verdict follows the path outcome (it could show GO on a "not yet" path); working node editor buttons (add, duplicate, delete, go to node) and saved edits; JSON import fixed; case-specific memo for HR and maintenance; fixes to the IT/EN toggle and to memo persistence on reload.
 
 **License**
 
