@@ -94,6 +94,12 @@
       z-index: 20;
     }
     @media (max-width:980px){ .topbar{ position:relative; top:0; } }
+    /* Telefono: brand sopra, pulsanti sotto su più righe (prima uscivano a destra dello schermo) */
+    @media (max-width:640px){
+      .topbar{ flex-direction:column; align-items:stretch; }
+      .brand{ min-width:0; }
+      .topbar .actions{ justify-content:flex-start; }
+    }
 
     .brand{ display:flex; align-items:center; gap:12px; min-width: 260px; }
     .logo{
