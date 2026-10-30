@@ -520,7 +520,7 @@
                 <input id="confThreshold" type="number" min="50" max="95" step="5" value="80" />
                 <input id="intentCount" type="number" min="4" max="20" step="1" value="10" />
               </div>
-              <div class="smallText">Sinistra: soglia confidenza %, destra: numero intent target.</div>
+              <div class="smallText" id="pocHelp">Sinistra: soglia confidenza %, destra: numero intent target.</div>
             </div>
           </div>
         </div>
@@ -566,7 +566,8 @@
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <button class="btn small" id="btnAddNode" title="Crea un nuovo nodo e collegalo">+ Nodo</button>
               <button class="btn small" id="btnDuplicateNode" title="Duplica il nodo corrente">⧉ Duplica</button>
-              <button class="btn small ghost" id="btnDeleteNode" title="Elimina il nodo corrente (non Start)">🗑 Elimina</button>
+              <button class="btn small ghost" id="btnDeleteNode" title="Elimina il nodo aperto nell'editor (non Start)">🗑 Elimina</button>
+              <button class="btn small ghost" id="btnResetTree" title="Ripristina l'albero originale di questo case">↺ Albero originale</button>
 
               <div style="display:flex;align-items:center;gap:8px;margin-left:4px;flex-wrap:wrap;">
                 <span class="tag" style="opacity:.9;">Vai al nodo</span>
@@ -875,12 +876,138 @@
       }
     };
 
+    // Testi della Decision Memo per ogni case: raccomandazione per verdetto, rischi, prossimo step.
+    // Nei rischi, {conf} diventa la soglia di confidenza scelta nei Parametri PoC.
+    const PLAYBOOKS = {
+      "email-triage-v2": {
+        usesIntents: true,
+        reco: {
+          "GO": [
+            "Approccio: AI con human-in-the-loop, routing, estrazione dati, audit log.",
+            "Rollout: progressivo, prima routing poi extraction, poi automazione parziale."
+          ],
+          "NOT YET": [
+            "Prima di scalare l'AI: integra ticketing/CRM, definisci tassonomia, crea dataset etichettato e logging.",
+            "Pilota ristretto su 1-2 categorie ad alto volume."
+          ],
+          "NO": [
+            "Non adottare AI ora: ottimizza processo con standardizzazione, regole e automazioni leggere.",
+            "Misura volumi e tempi per 4 settimane, poi rivaluta."
+          ],
+          "ATTENZIONE": [
+            "Serve governance: soglie, audit log, fallback umano, monitoraggio errori e drift.",
+            "Rollout progressivo con stop criteria chiare."
+          ]
+        },
+        risks: [
+          "Rischio: dati rumorosi o etichette incoerenti.",
+          "Mitigazione: tassonomia 8–12 intent, guideline di etichettatura, dataset 'golden'.",
+          "Rischio: over-automation iniziale.",
+          "Mitigazione: soglia confidenza {conf}% + fallback umano sotto soglia + audit log.",
+          "Rischio: mismatch col processo reale.",
+          "Mitigazione: workshop con operatori, mappatura eccezioni, KPI di adozione."
+        ],
+        next: [
+          "PoC 2 settimane:",
+          "- Dataset: 500–1.000 casi reali, etichettati in 8–12 categorie.",
+          "- KPI: accuracy, riduzione TAT, % fallback umano, error rate routing, adozione interna.",
+          "- Guardrail: threshold, log, classi critiche sempre con revisione umana.",
+          "- Stop criteria: se accuracy < X o TAT non scende almeno Y%, fermare o riprogettare."
+        ]
+      },
+      "hr-screening-v1": {
+        usesIntents: false,
+        reco: {
+          "GO": [
+            "Approccio: AI come supporto al triage, con evidenze citate per ogni CV e decisione finale sempre umana.",
+            "Rollout: un ruolo ricorrente alla volta, in parallelo con la shortlist del recruiter."
+          ],
+          "NOT YET": [
+            "Prima dell'AI: formalizza criteri must-have/nice-to-have e rubriche di valutazione condivise.",
+            "Raccogli 2-3 cicli di selezione con decisioni motivate, poi rivaluta."
+          ],
+          "NO": [
+            "Non adottare AI ora: con pochi CV conviene un processo umano standardizzato con criteri chiari.",
+            "Usa scorecard condivise tra valutatori per ridurre l'inconsistenza."
+          ],
+          "ATTENZIONE": [
+            "Serve governance: niente ranking automatico, review umana su ogni scarto, monitoraggio bias.",
+            "Coinvolgi Legal/Privacy prima del pilota: lo screening CV con AI rientra tra gli usi ad alto rischio dell'AI Act."
+          ]
+        },
+        risks: [
+          "Rischio: bias (genere, età, provenienza) ereditati dallo storico delle selezioni.",
+          "Mitigazione: test di disparità sugli output, criteri espliciti, dati sensibili esclusi.",
+          "Rischio: suggerimenti non spiegabili ai candidati o in audit.",
+          "Mitigazione: evidenze citate per ogni suggerimento + log delle decisioni umane.",
+          "Rischio: recruiter che si affidano al suggerimento senza verificarlo.",
+          "Mitigazione: sotto il {conf}% di confidenza il CV va in revisione completa, review a campione anche sopra soglia."
+        ],
+        next: [
+          "PoC 3 settimane:",
+          "- Dataset: 200–300 CV di 1-2 ruoli ricorrenti, già valutati dai recruiter.",
+          "- KPI: concordanza con la shortlist umana, tempo di screening per CV, % CV in revisione completa, differenze di esito tra gruppi.",
+          "- Guardrail: nessuno scarto automatico, evidenze per ogni suggerimento, log decisioni.",
+          "- Stop criteria: se la concordanza è < X o emergono differenze tra gruppi non spiegate, fermare o riprogettare."
+        ]
+      },
+      "maintenance-v1": {
+        usesIntents: false,
+        reco: {
+          "GO": [
+            "Approccio: anomaly detection su asset critici, alert integrati nel CMMS con soglie conservative.",
+            "Rollout: una famiglia di asset pilota, poi estensione. La predizione guasti arriva quando lo storico lo consente."
+          ],
+          "NOT YET": [
+            "Prima dell'AI: pulisci telemetria e storico guasti, definisci il workflow alert → ticket → intervento.",
+            "Integra CMMS/ERP: senza chiusura del loop l'alert resta un grafico."
+          ],
+          "NO": [
+            "Non adottare AI ora: con downtime poco costoso bastano manutenzione preventiva e regole a soglia.",
+            "Misura costi di fermo e interventi per un trimestre, poi rivaluta."
+          ],
+          "ATTENZIONE": [
+            "Serve governance: soglie calibrate per asset, revisione dei falsi positivi, feedback dei tecnici.",
+            "Rollout progressivo con stop criteria chiare."
+          ]
+        },
+        risks: [
+          "Rischio: falsi positivi che fermano impianti senza motivo.",
+          "Mitigazione: alert solo sopra il {conf}% di confidenza, conferma del tecnico prima del fermo.",
+          "Rischio: dati sensori incompleti o non sincronizzati.",
+          "Mitigazione: controlli automatici di qualità dati, gestione dei sensori offline.",
+          "Rischio: tecnici che ignorano gli alert.",
+          "Mitigazione: alert dentro il CMMS, feedback sull'esito di ogni intervento, KPI di adozione."
+        ],
+        next: [
+          "PoC 6–8 settimane:",
+          "- Dati: 6–12 mesi di telemetria e storico guasti su una famiglia di asset critici.",
+          "- KPI: guasti anticipati, falsi positivi per settimana, ore di fermo evitate, tempo alert → intervento.",
+          "- Guardrail: soglie conservative, conferma del tecnico prima del fermo, log degli alert.",
+          "- Stop criteria: se i falsi positivi superano X a settimana o nessun guasto viene anticipato, fermare o riprogettare."
+        ]
+      }
+    };
+
+    // Verdetto quando il percorso è chiuso: comanda l'esito (END_*), non i punteggi.
+    const ENDING_VERDICTS = {
+      END_GO:      { badge:"good", title:"AI consigliata", tag:"GO" },
+      END_RISKY:   { badge:"warn", title:"AI possibile, ma troppo rischiosa così", tag:"ATTENZIONE" },
+      END_NOT_YET: { badge:"warn", title:"AI possibile, ma non ora", tag:"NOT YET" },
+      END_RULES:   { badge:"bad",  title:"Bastano regole e automazioni leggere", tag:"NO" },
+      END_NO:      { badge:"bad",  title:"AI non necessaria", tag:"NO" }
+    };
+
+    // Copia degli alberi originali, per "Ripristina albero"
+    const DEFAULT_TREES = JSON.parse(JSON.stringify(TREES));
+
     const APP = "AI Decision Tree Builder (Editor + Visualizer)";
     const THEME_KEY = "aidt_theme_editor_v1";
     const CASE_KEY = "aidt_selected_case_editor_v1";
     const EDITOR_KEY = "aidt_editor_mode_v1";
     const VIZ_KEY = "aidt_viz_mode_v1";
     function storageKeyForCase(caseId){ return `aidt_state_${caseId}_editor_v1`; }
+    function treeKeyForCase(caseId){ return `aidt_tree_${caseId}_editor_v1`; }
 
     const $ = (sel) => document.querySelector(sel);
     const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -888,6 +1015,7 @@
     let state = null;
     let activeCaseId = null;
     let editorMode = false;
+    let editNodeId = null; // nodo aperto nell'editor (può differire dal nodo corrente del percorso)
     let vizMode = false;
     let treeVizState = {
       zoom: 1,
@@ -966,6 +1094,25 @@
       renderJsonPreview();
     }
 
+    function isValidTree(tree){
+      return !!(tree && typeof tree === "object" && tree.nodes && typeof tree.nodes === "object"
+        && tree.nodes[tree.start] && tree.defaults);
+    }
+
+    function loadSavedTrees(){
+      Object.keys(TREES).forEach(caseId => {
+        try{
+          const saved = JSON.parse(localStorage.getItem(treeKeyForCase(caseId)) || "null");
+          if (isValidTree(saved)) TREES[caseId] = saved;
+        }catch(e){ /* albero salvato corrotto: resta quello di default */ }
+      });
+    }
+
+    function saveTree(){
+      localStorage.setItem(treeKeyForCase(activeCaseId), JSON.stringify(TREES[activeCaseId]));
+      $("#savedPill").textContent = LANG[currentLang].saved;
+    }
+
     function pct(n){ return clamp(Math.round(n), 0, 100); }
 
     function verdictFromScores(fit, ready, risk){
@@ -982,67 +1129,54 @@
       return { badge:"warn", title:"Valutazione mista, serve approfondimento", tag:"ATTENZIONE" };
     }
 
+    // Verdetto corrente: a percorso chiuso vale l'esito, durante il percorso è una stima dai punteggi.
+    function currentVerdict(){
+      const {fit, ready, risk} = state.score;
+      const byEnding = ENDING_VERDICTS[state.ending];
+      if (!byEnding) return verdictFromScores(fit, ready, risk);
+      if (state.ending === "END_GO" && risk > 60){
+        return { badge:"warn", title:"AI sì, ma con guardrail forti", tag:"ATTENZIONE" };
+      }
+      return byEnding;
+    }
+
+    function playbook(){
+      return PLAYBOOKS[activeCaseId] || PLAYBOOKS["email-triage-v2"];
+    }
+
+    function confThreshold(){
+      return clamp(parseInt(state.params.confThreshold,10)||80, 50, 95);
+    }
+
     function buildRecoText(){
       const {fit, ready, risk} = state.score;
-      const v = verdictFromScores(fit, ready, risk);
-      const conf = clamp(parseInt(state.params.confThreshold,10)||80, 50, 95);
+      const v = currentVerdict();
+      const pb = playbook();
+      const conf = confThreshold();
       const intents = clamp(parseInt(state.params.intentCount,10)||10, 4, 20);
 
       const base = [
         `Verdetto: ${v.title}.`,
         `Punteggi: Fit ${pct(fit)}%, Readiness ${pct(ready)}%, Rischio ${pct(risk)}%.`,
-        `Parametri PoC: soglia confidenza ${conf}%, intent target ${intents}.`
+        pb.usesIntents
+          ? `Parametri PoC: soglia confidenza ${conf}%, intent target ${intents}.`
+          : `Parametri PoC: soglia confidenza ${conf}%.`
       ];
-
-      if (v.tag === "GO"){
-        base.push(
-          "Approccio: AI con human-in-the-loop, routing, estrazione dati, audit log.",
-          "Rollout: progressivo, prima routing poi extraction, poi automazione parziale."
-        );
-      }else if (v.tag === "NOT YET"){
-        base.push(
-          "Prima di scalare l'AI: integra ticketing/CRM, definisci tassonomia, crea dataset etichettato e logging.",
-          "Pilota ristretto su 1-2 categorie ad alto volume."
-        );
-      }else if (v.tag === "NO"){
-        base.push(
-          "Non adottare AI ora: ottimizza processo con standardizzazione, regole e automazioni leggere.",
-          "Misura volumi e tempi per 4 settimane, poi rivaluta."
-        );
-      }else{
-        base.push(
-          "Serve governance: soglie, audit log, fallback umano, monitoraggio errori e drift.",
-          "Rollout progressivo con stop criteria chiare."
-        );
-      }
-
+      base.push(...(pb.reco[v.tag] || pb.reco["ATTENZIONE"]));
       return base.join("\n");
     }
 
     function buildRisksText(){
-      const conf = clamp(parseInt(state.params.confThreshold,10)||80, 50, 95);
-      const common = [
-        "Rischio: dati rumorosi o etichette incoerenti.",
-        "Mitigazione: tassonomia 8–12 intent, guideline di etichettatura, dataset 'golden'.",
-        "Rischio: over-automation iniziale.",
-        `Mitigazione: soglia confidenza ${conf}% + fallback umano sotto soglia + audit log.`,
-        "Rischio: mismatch col processo reale.",
-        "Mitigazione: workshop con operatori, mappatura eccezioni, KPI di adozione."
-      ];
+      const conf = confThreshold();
+      const lines = playbook().risks.map(l => l.replace("{conf}", conf));
       if (state.score.risk >= 70){
-        common.unshift("Rischio elevato: human-in-the-loop obbligatorio per classi critiche e governance formale.");
+        lines.unshift("Rischio elevato: human-in-the-loop obbligatorio sui casi critici e governance formale.");
       }
-      return common.join("\n");
+      return lines.join("\n");
     }
 
     function buildNextText(){
-      return [
-        "PoC 2 settimane:",
-        "- Dataset: 500–1.000 casi reali, etichettati in 8–12 categorie.",
-        "- KPI: accuracy, riduzione TAT, % fallback umano, error rate routing, adozione interna.",
-        "- Guardrail: threshold, log, classi critiche sempre con revisione umana.",
-        "- Stop criteria: se accuracy < X o TAT non scende almeno Y%, fermare o riprogettare."
-      ].join("\n");
+      return playbook().next.join("\n");
     }
 
     function buildMemoText(){
@@ -1118,6 +1252,13 @@
     function selectChoice(nodeId, choice){
       const tree = TREES[activeCaseId];
       const node = tree.nodes[nodeId];
+      const next = String(choice.n || "");
+
+      // Con l'editor si può scrivere un "next" che non esiste: non avanzare su un nodo vuoto
+      if (!next.startsWith("END_") && !tree.nodes[next]){
+        showToast(next ? `Il nodo "${next}" non esiste` : "Questa scelta non ha un nodo successivo");
+        return;
+      }
 
       applyScores(choice.s || {});
       state.path.push({
@@ -1133,11 +1274,15 @@
         state.current = choice.n;
       }
 
-      $("#memoReco").value = buildRecoText();
-      $("#memoRisks").value = buildRisksText();
-      $("#memoNext").value = buildNextText();
+      state.memo.reco = buildRecoText();
+      state.memo.risks = buildRisksText();
+      state.memo.next = buildNextText();
+      $("#memoReco").value = state.memo.reco;
+      $("#memoRisks").value = state.memo.risks;
+      $("#memoNext").value = state.memo.next;
 
       saveState();
+      if (editorMode && !state.ending) loadEditorForNode(state.current);
       render();
     }
 
@@ -1156,6 +1301,7 @@
       $("#intentCount").value = state.params.intentCount;
 
       saveState();
+      if (editorMode) loadEditorForNode(state.current);
       render();
       showToast("Reset completato");
     }
@@ -1205,7 +1351,7 @@
       });
       $("#pathChips").innerHTML = pathHtml || '<div class="smallText">Nessuna scelta ancora.</div>';
 
-      const v = verdictFromScores(fit, ready, risk);
+      const v = currentVerdict();
       $("#verdictTitle").textContent = v.title;
       $("#verdictText").textContent = state.ending ? "Percorso completato. Rivedi la Decision Memo." : "Completa il percorso per vedere il verdetto finale.";
       $("#verdictBadge").textContent = v.tag;
@@ -1541,12 +1687,27 @@
       $("#confThreshold").value = state.params.confThreshold;
       $("#intentCount").value = state.params.intentCount;
 
-      if(state.memo.reco) $("#memoReco").value = state.memo.reco;
-      if(state.memo.risks) $("#memoRisks").value = state.memo.risks;
-      if(state.memo.next) $("#memoNext").value = state.memo.next;
-
+      // Sempre assegnati: altrimenti resta a video la memo del case precedente
+      $("#memoReco").value = state.memo.reco || "";
+      $("#memoRisks").value = state.memo.risks || "";
+      $("#memoNext").value = state.memo.next || "";
+      updatePocParams();
+      if (editorMode) loadEditorForNode(state.current);
       render();
     }
+
+    // Il numero di intent ha senso solo per l'email triage
+    function updatePocParams(){
+      const usesIntents = playbook().usesIntents;
+      $("#intentCount").style.display = usesIntents ? "" : "none";
+      $("#intentCount").parentElement.style.gridTemplateColumns = usesIntents ? "1fr 1fr" : "1fr";
+      const t = LANG[currentLang];
+      $("#pocHelp").textContent = usesIntents ? t.pocDesc : t.pocDescNoIntent;
+    }
+
+    ["#editLabel","#editStep","#editQuestion","#editHelp"].forEach(sel => {
+      $(sel).addEventListener("input", () => applyEditorChanges());
+    });
 
     function toggleEditor(){
       editorMode = !editorMode;
@@ -1572,7 +1733,8 @@
       const tree = TREES[activeCaseId];
       const node = tree.nodes[nodeId];
       if(!node) return;
-
+      editNodeId = nodeId;
+      refreshGoNodeSelect();
       $("#editNodeIdTag").textContent = `ID: ${nodeId}`;
       $("#editLabel").value = node.label || "";
       $("#editStep").value = node.step || 1;
@@ -1605,8 +1767,9 @@
 
     function applyEditorChanges(){
       const tree = TREES[activeCaseId];
-      const node = tree.nodes[state.current];
+      const node = tree.nodes[editNodeId];
       if(!node) return;
+      const oldChoices = node.choices || [];
 
       node.label = $("#editLabel").value.trim();
       node.step = parseInt($("#editStep").value,10)||1;
@@ -1618,7 +1781,8 @@
       inputs.forEach(inp=>{
         const idx = parseInt(inp.dataset.idx,10);
         const field = inp.dataset.field;
-        if(!choicesData[idx]) choicesData[idx] = { s:{} };
+        // la chiave (k) non è nei campi dell'editor: va conservata, serve al percorso
+        if(!choicesData[idx]) choicesData[idx] = { k: oldChoices[idx]?.k || `choice${idx}`, s:{} };
 
         if(field==="s.fit") choicesData[idx].s.fit = parseInt(inp.value,10)||0;
         else if(field==="s.ready") choicesData[idx].s.ready = parseInt(inp.value,10)||0;
@@ -1627,16 +1791,121 @@
       });
 
       node.choices = Object.values(choicesData).filter(ch=> ch.t || ch.n);
+      saveTree();
+      refreshGoNodeSelect();
       render();
     }
 
+    function nodeOptionLabel(id, node){
+      return node.label && node.label !== id ? `${id} · ${node.label}` : id;
+    }
+
+    function refreshGoNodeSelect(){
+      const tree = TREES[activeCaseId];
+      const q = ($("#goNodeSearch").value || "").trim().toLowerCase();
+      const sel = $("#goNodeSelect");
+      sel.innerHTML = "";
+      Object.entries(tree.nodes).forEach(([id, node]) => {
+        const label = nodeOptionLabel(id, node);
+        if (q && !label.toLowerCase().includes(q)) return;
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      });
+      if (editNodeId && sel.querySelector(`option[value="${CSS.escape(editNodeId)}"]`)) sel.value = editNodeId;
+    }
+
+    function newNodeId(tree){
+      let i = 1;
+      while (tree.nodes[`N${i}`]) i++;
+      return `N${i}`;
+    }
+
+    function addNode(){
+      const tree = TREES[activeCaseId];
+      const parent = tree.nodes[editNodeId];
+      if (!parent) return;
+      const id = newNodeId(tree);
+      tree.nodes[id] = {
+        label: `Nodo ${id}`, step: Math.min((parent.step || 1) + 1, 6),
+        q: "Nuova domanda", h: "",
+        choices: [
+          {k:"yes", t:"Sì", d:"", n:"END_GO", s:{fit:0, ready:0, risk:0}},
+          {k:"no",  t:"No", d:"", n:"END_NO", s:{fit:0, ready:0, risk:0}}
+        ]
+      };
+      // collega il nuovo nodo al nodo aperto con una nuova scelta
+      parent.choices = parent.choices || [];
+      parent.choices.push({k:`to_${id}`, t:`Vai a ${id}`, d:"", n:id, s:{fit:0, ready:0, risk:0}});
+      saveTree();
+      loadEditorForNode(id);
+      render();
+      showToast(`Nodo ${id} creato e collegato`);
+    }
+
+    function duplicateNode(){
+      const tree = TREES[activeCaseId];
+      const src = tree.nodes[editNodeId];
+      if (!src) return;
+      const id = newNodeId(tree);
+      tree.nodes[id] = JSON.parse(JSON.stringify(src));
+      tree.nodes[id].label = `${src.label || editNodeId} (copia)`;
+      saveTree();
+      loadEditorForNode(id);
+      render();
+      showToast(`Nodo duplicato come ${id} (non ancora collegato)`);
+    }
+
+    function deleteNode(){
+      const tree = TREES[activeCaseId];
+      const id = editNodeId;
+      if (!tree.nodes[id]) return;
+      if (id === tree.start){ showToast("Il nodo iniziale non si può eliminare"); return; }
+      const incoming = Object.values(tree.nodes).reduce((n, node) =>
+        n + (node.choices || []).filter(ch => ch.n === id).length, 0);
+      const msg = incoming
+        ? `Eliminare il nodo ${id}? Verranno rimosse anche ${incoming} scelte che portano qui.`
+        : `Eliminare il nodo ${id}?`;
+      if (!confirm(msg)) return;
+      delete tree.nodes[id];
+      Object.values(tree.nodes).forEach(node => {
+        node.choices = (node.choices || []).filter(ch => ch.n !== id);
+      });
+      saveTree();
+      // se il percorso passava dal nodo eliminato non è più valido: si riparte
+      if (state.current === id || state.path.some(p => p.nodeId === id)) resetCase();
+      loadEditorForNode(tree.nodes[state.current] ? state.current : tree.start);
+      render();
+      showToast(`Nodo ${id} eliminato`);
+    }
+
+    function resetTree(){
+      if (!confirm("Ripristinare l'albero originale di questo case? Le modifiche dell'editor andranno perse e il percorso riparte.")) return;
+      TREES[activeCaseId] = JSON.parse(JSON.stringify(DEFAULT_TREES[activeCaseId]));
+      localStorage.removeItem(treeKeyForCase(activeCaseId));
+      resetCase();
+      loadEditorForNode(state.current);
+    }
+
+    $("#btnAddNode").addEventListener("click", addNode);
+    $("#btnDuplicateNode").addEventListener("click", duplicateNode);
+    $("#btnDeleteNode").addEventListener("click", deleteNode);
+    $("#btnResetTree").addEventListener("click", resetTree);
+    $("#goNodeSearch").addEventListener("input", refreshGoNodeSelect);
+    $("#btnGoNode").addEventListener("click", () => {
+      const id = $("#goNodeSelect").value;
+      if (id) loadEditorForNode(id);
+    });
+
     $("#btnAddChoice").addEventListener("click",()=>{
       const tree = TREES[activeCaseId];
-      const node = tree.nodes[state.current];
+      const node = tree.nodes[editNodeId];
       if(!node) return;
       if(!node.choices) node.choices=[];
       node.choices.push({k:`choice${node.choices.length}`, t:"Nuova scelta", d:"", n:"", s:{fit:0,ready:0,risk:0}});
-      loadEditorForNode(state.current);
+      saveTree();
+      loadEditorForNode(editNodeId);
     });
 
     $("#btnTheme").addEventListener("click",()=>{
@@ -1662,17 +1931,26 @@
       reader.onload = (ev)=>{
         try{
           const data = JSON.parse(ev.target.result);
-          if(data.state){
-            state = data.state;
-            activeCaseId = state.caseId;
-            switchCase(activeCaseId);
-            showToast("Stato importato");
+          const caseId = data?.state?.caseId;
+          if(!caseId || !TREES[caseId] || !data.state.score || !Array.isArray(data.state.path)){
+            showToast(LANG[currentLang].importError);
+            return;
           }
+          // l'export contiene anche gli alberi (eventualmente modificati con l'editor)
+          if(isValidTree(data.trees?.[caseId])){
+            TREES[caseId] = data.trees[caseId];
+            localStorage.setItem(treeKeyForCase(caseId), JSON.stringify(TREES[caseId]));
+          }
+          // salva prima di switchCase, che rilegge lo stato da localStorage
+          localStorage.setItem(storageKeyForCase(caseId), JSON.stringify(data.state));
+          switchCase(caseId);
+          showToast(LANG[currentLang].stateImported);
         }catch(err){
           showToast("Errore import JSON");
         }
       };
       reader.readAsText(file);
+      e.target.value = ""; // permette di reimportare lo stesso file
     });
 
     $("#btnPrint").addEventListener("click",()=> window.print());
@@ -1698,6 +1976,9 @@
         caseDesc: "Ogni case salva il suo stato separatamente (localStorage).",
         pocParams: "Parametri PoC",
         pocDesc: "Sinistra: soglia confidenza %, destra: numero intent target.",
+        pocDescNoIntent: "Soglia di confidenza %: sotto soglia decide una persona.",
+        end: "FINE",
+        completedStep: "Completato",
         node: "Nodo",
         step: "Step",
         fitAI: "Fit AI",
@@ -1773,6 +2054,9 @@
         caseDesc: "Each case saves its state separately (localStorage).",
         pocParams: "PoC Parameters",
         pocDesc: "Left: confidence threshold %, right: target intent count.",
+        pocDescNoIntent: "Confidence threshold %: below it, a person decides.",
+        end: "END",
+        completedStep: "Completed",
         node: "Node",
         step: "Step",
         fitAI: "AI Fit",
@@ -1843,16 +2127,21 @@
     function updateUILanguage() {
       const t = LANG[currentLang];
       
+      // render() riscrive nodo, step e verdetto correnti; sotto si traducono solo le etichette
+      if (state) render();
+      
       document.querySelector('.title span').textContent = t.subtitle;
       
-      const cardHeaders = document.querySelectorAll('.cardHeader h2');
-      const cardDescs = document.querySelectorAll('.cardHeader p');
-      if (cardHeaders[0]) cardHeaders[0].textContent = t.decision;
-      if (cardDescs[0]) cardDescs[0].textContent = t.decisionDesc;
-      if (cardHeaders[1]) cardHeaders[1].textContent = t.treeViz;
-      if (cardDescs[1]) cardDescs[1].textContent = t.treeDesc;
-      if (cardHeaders[2]) cardHeaders[2].textContent = t.decisionMemo;
-      if (cardDescs[2]) cardDescs[2].textContent = t.memoDesc;
+      // Selettori per card: l'ordine nel DOM è Albero, Decisione, Memo
+      const cardHeader = (sel, title, desc) => {
+        const h = document.querySelector(`${sel} .cardHeader h2`);
+        const p = document.querySelector(`${sel} .cardHeader p`);
+        if (h) h.textContent = title;
+        if (p) p.textContent = desc;
+      };
+      cardHeader('#treeVizCard', t.treeViz, t.treeDesc);
+      cardHeader('.grid > .card:nth-child(1)', t.decision, t.decisionDesc);
+      cardHeader('.grid > .card:nth-child(2)', t.decisionMemo, t.memoDesc);
       
       const labels = document.querySelectorAll('.label');
       labels.forEach(label => {
@@ -1878,7 +2167,6 @@
       smallTexts.forEach(st => {
         const text = st.textContent.trim();
         if (text.includes('localStorage')) st.textContent = t.caseDesc;
-        if (text.includes('soglia') || text.includes('threshold')) st.textContent = t.pocDesc;
         if (text.includes('condizioni di stop') || text.includes('stop criteria')) st.textContent = t.stopCriteria;
         if (text.includes('GitHub')) st.textContent = t.versionDesc;
         if (text.includes('Regola:') || text.includes('Rule:')) st.textContent = t.ruleText;
@@ -1892,8 +2180,10 @@
       if (meters[1]) meters[1].textContent = t.readiness;
       if (meters[2]) meters[2].textContent = t.risk;
       
-      $('#nodeTag').textContent = t.node;
-      $('#stepTag').textContent = t.step;
+      if (state?.ending){
+        $('#nodeTag').textContent = t.end;
+        $('#stepTag').textContent = t.completedStep;
+      }
       
       const legendItems = document.querySelectorAll('.legend-item span');
       if (legendItems[0]) legendItems[0].textContent = t.visited;
@@ -1916,7 +2206,6 @@
       $('#btnPrint').querySelector('span:last-child').textContent = t.print;
       $('#btnCopyMemo').querySelector('span:last-child').textContent = t.copyMemo;
       
-      $('#verdictTitle').textContent = t.provisionalVerdict;
       if (state && !state.ending) {
         $('#verdictText').textContent = t.completePathText;
       }
@@ -1980,7 +2269,7 @@
       btn.classList.toggle('active', currentLang === 'it');
       
       updateUILanguage();
-      
+      updatePocParams();
       const t = LANG[currentLang];
       showToast(t.languageActivated);
     }
@@ -2013,7 +2302,9 @@
       initTheme();
       initCaseSelect();
 
-      const savedCase = localStorage.getItem(CASE_KEY) || Object.keys(TREES)[0];
+      loadSavedTrees();
+      const storedCase = localStorage.getItem(CASE_KEY);
+      const savedCase = TREES[storedCase] ? storedCase : Object.keys(TREES)[0];
       const savedEditor = localStorage.getItem(EDITOR_KEY)==="1";
       const savedViz = localStorage.getItem(VIZ_KEY)==="1";
       
@@ -2028,8 +2319,11 @@
       if(vizMode) {
         renderTreeVisualization();
       }
-      
+      const langBtn = $('#langToggle');
+      langBtn.textContent = currentLang === 'it' ? '🇮🇹 IT' : '🇺🇸 EN';
+      langBtn.classList.toggle('active', currentLang === 'it');
       updateUILanguage();
+      updatePocParams();
     });
   </script>
 </body>
